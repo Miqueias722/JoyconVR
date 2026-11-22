@@ -1,0 +1,108 @@
+// Configuração do JoyconVR. Linhas que começam com // são comentários.
+// Depois de mudar algo aqui, feche e abra o SteamVR de novo.
+{
+  "joyconcal_path": "config/joyconcal.json",
+
+  // Janela do "headset" no monitor
+  "hmd": {
+    "enabled": true,
+    "window_x": 0,
+    "window_y": 0,
+    "window_width": 0,         // 0 = descobre sozinho a resolução do monitor principal
+    "window_height": 0,
+    "fov_vertical_deg": 75,    // campo de visão; maior = vê mais, mas fica mais "olho de peixe"
+    "refresh_hz": 60,
+    "head_height_m": 1.65      // altura da cabeça em metros (sentado: uns 1.20)
+  },
+
+  // Olhar em volta
+  "look": {
+    // Aperte Captura (botão quadrado do Joy-Con esquerdo) para ligar/desligar o "modo olhar".
+    // No modo olhar, o analógico DIREITO vira a câmera (e o esquerdo continua andando).
+    // Para usar o esquerdo para olhar, troque "right" por "left".
+    "toggle": { "hand": "left", "button": "capture" },
+    "stick_hand": "right",
+    // true = o analógico direito SEMPRE mexe a câmera; toque no Captura para desligar/ligar isso.
+    "always_on": true,
+    "yaw_speed_deg": 140,
+    "pitch_speed_deg": 90,
+    "max_pitch_deg": 80,
+    // Segurar o botão do meio do mouse (a rodinha) e mexer o mouse também vira a câmera.
+    "mouse_look": true,
+    "mouse_deg_per_pixel": 0.15
+  },
+
+  // Recentralizar: segure este botão por 0.8 s apontando os dois Joy-Cons para a tela.
+  "recenter": { "hand": "left", "button": "capture", "hold_seconds": 0.8 },
+
+  // Modelo do braço (em metros). A posição da mão é calculada a partir da rotação do Joy-Con.
+  "arm": {
+    "shoulder_x": 0.18,
+    "shoulder_y": -0.20,
+    "shoulder_z": 0.05,
+    "upper_arm": 0.28,
+    "forearm": 0.30,
+    "elbow_follow": 0.35
+  },
+
+  "imu": {
+    "gyro_scale_dps": 0.070,
+    "accel_scale_g": 0.000244,
+    "tilt_correction": 1.0
+  },
+
+  // Joy-Con 2 (Switch 2): eles conectam pelo programa JoyconVR-Joycon2.exe
+  "switch2": {
+    "enabled": true,
+    "udp_port": 27760,
+    "gyro_scale_dps": 0.0609,   // se girar 90° e a mão girar menos/mais, ajuste aqui
+    "invert_x": false,
+    "invert_y": false,
+    "analog_deadzone": 0.0,   // a zona morta do Joy-Con 2 agora fica na janela (aba Ajustes)
+    // Se a mão apontar para trás, troque "+y" por "-y". Se não subir/descer, teste "+x" ou "-x"
+    "left":  { "forward_axis": "+y", "flip_up": false },
+    "right": { "forward_axis": "+y", "flip_up": false }
+  },
+
+  // Botões: nomes do Joy-Con -> ação no SteamVR.
+  // Ações: system, menu, a, b, x, y, grip, trigger_click, thumbstick_click, none
+  "hands": {
+    "left": {
+      "invert_x": false,
+      "invert_y": true,
+      "analog_deadzone": 0.08,
+      // Se a mão apontar para TRÁS, troque "+x" por "-x". Se ficar de cabeça para baixo, use "flip_up": true
+      "forward_axis": "+x",
+      "flip_up": false,
+      // Segure este botão para "esticar" o braço para frente (ex.: "sl"). Vazio = desligado.
+      "extend_button": "",
+      "extend_distance": 0.25,
+      "button_bindings": {
+        "minus": "system",
+        "zl": "trigger_click",
+        "l": "grip",
+        "stick": "thumbstick_click",
+        "up": "b",
+        "down": "a"
+      }
+    },
+    "right": {
+      "invert_x": false,
+      "invert_y": true,
+      "analog_deadzone": 0.08,
+      "forward_axis": "+x",
+      "flip_up": false,
+      "extend_button": "",
+      "extend_distance": 0.25,
+      "button_bindings": {
+        "plus": "system",
+        "home": "menu",
+        "zr": "trigger_click",
+        "r": "grip",
+        "stick": "thumbstick_click",
+        "x": "b",
+        "b": "a"
+      }
+    }
+  }
+}

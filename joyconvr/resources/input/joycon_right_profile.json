@@ -1,0 +1,154 @@
+{
+  "jsonid": "input_profile",
+  "controller_type": "joycon_right",
+  "compatibility_mode_controller_type": "knuckles",
+  "device_class": "TrackedDeviceClass_Controller",
+  "resource_root": "joyconvr",
+  "input_bindingui_mode": "controller_handed",
+  "input_bindingui_left": {
+    "image": "{indexcontroller}/icons/indexcontroller_left.svg"
+  },
+  "input_bindingui_right": {
+    "image": "{indexcontroller}/icons/indexcontroller_right.svg"
+  },
+  "input_source": {
+    "/input/system": {
+      "type": "button",
+      "binding_image_point": [
+        0.1,
+        0.1
+      ]
+    },
+    "/input/application_menu": {
+      "type": "button",
+      "binding_image_point": [
+        0.2,
+        0.1
+      ]
+    },
+    "/input/a": {
+      "type": "button",
+      "binding_image_point": [
+        0.65,
+        0.45
+      ],
+      "touch": true
+    },
+    "/input/b": {
+      "type": "button",
+      "binding_image_point": [
+        0.58,
+        0.52
+      ],
+      "touch": true
+    },
+    "/input/x": {
+      "type": "button",
+      "binding_image_point": [
+        0.42,
+        0.45
+      ]
+    },
+    "/input/y": {
+      "type": "button",
+      "binding_image_point": [
+        0.35,
+        0.52
+      ]
+    },
+    "/input/grip": {
+      "type": "trigger",
+      "click": true,
+      "touch": true,
+      "value": true,
+      "force": true,
+      "binding_image_point": [
+        0.08,
+        0.58
+      ]
+    },
+    "/input/trigger": {
+      "type": "trigger",
+      "click": true,
+      "binding_image_point": [
+        0.9,
+        0.2
+      ],
+      "touch": true,
+      "value": true
+    },
+    "/input/thumbstick": {
+      "type": "joystick",
+      "click": true,
+      "binding_image_point": [
+        0.5,
+        0.68
+      ],
+      "touch": true
+    },
+    "/input/joycon_plus": {
+      "type": "button"
+    },
+    "/input/joycon_home": {
+      "type": "button"
+    },
+    "/input/joycon_a": {
+      "type": "button"
+    },
+    "/input/joycon_b": {
+      "type": "button"
+    },
+    "/input/joycon_x": {
+      "type": "button"
+    },
+    "/input/joycon_y": {
+      "type": "button"
+    },
+    "/input/joycon_r": {
+      "type": "button"
+    },
+    "/input/joycon_zr": {
+      "type": "button"
+    },
+    "/input/joycon_sl": {
+      "type": "button"
+    },
+    "/input/joycon_sr": {
+      "type": "button"
+    },
+    "/input/joycon_stick": {
+      "type": "button"
+    },
+    "/input/joycon_minus": {
+      "type": "button"
+    },
+    "/input/joycon_capture": {
+      "type": "button"
+    },
+    "/input/joycon_up": {
+      "type": "button"
+    },
+    "/input/joycon_down": {
+      "type": "button"
+    },
+    "/input/joycon_left": {
+      "type": "button"
+    },
+    "/input/joycon_right": {
+      "type": "button"
+    },
+    "/input/joycon_l": {
+      "type": "button"
+    },
+    "/input/joycon_zl": {
+      "type": "button"
+    },
+    "/output/haptic": {
+      "type": "vibration",
+      "binding_image_point": [
+        0.5,
+        0.5
+      ]
+    }
+  }
+}

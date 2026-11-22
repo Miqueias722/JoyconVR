@@ -1,0 +1,131 @@
+JoyconVR - Joy-Cons como controles de VR, jogando no monitor
+=============================================================
+
+O que é
+-------
+Um driver grátis para o SteamVR que:
+  * cria um "headset" virtual que mostra o jogo numa janela no monitor;
+  * transforma os dois Joy-Cons em controles de VR (estilo Valve Index);
+  * usa o giroscópio dos Joy-Cons para girar as mãos e calcula a posição da mão
+    com um "modelo de braço" (parecido com o rastreamento virtual do Driver4VR).
+
+Limitações (é bom saber antes)
+------------------------------
+  * Os Joy-Cons só sabem para onde estão APONTANDO, não ONDE estão. Então você
+    não consegue mover a mão para frente/trás de verdade. A posição é estimada.
+  * Com o tempo a direção esquerda/direita pode "escorregar" um pouco. É só
+    recentralizar (veja abaixo).
+  * Jogos que exigem muito movimento físico (ex.: se abaixar, alcançar longe)
+    ficam difíceis. Jogos de mirar/apontar e menus funcionam melhor.
+
+Instalação
+----------
+1. Extraia este .zip numa pasta fixa, por exemplo C:\JoyconVR
+   (depois de instalar, NÃO mova nem apague essa pasta).
+2. Instale o SteamVR pela Steam e abra ele uma vez. Depois feche.
+3. Dê dois cliques em INSTALAR.bat
+   - Se o Windows mostrar "O Windows protegeu o computador", clique em
+     "Mais informações" e depois em "Executar assim mesmo".
+4. (Joy-Con do Switch 1) Pareie os Joy-Cons: Configurações do Windows > Bluetooth > Adicionar
+   dispositivo > Bluetooth. No Joy-Con, segure o botãozinho redondo do trilho
+   (lateral) até as luzes ficarem correndo. Faça com os dois.
+   Joy-Con 2 do Switch 2: NÃO faça isso, veja a seção "JOY-CON 2" abaixo.
+5. Abra o SteamVR. Deve abrir uma janela com a visão do VR.
+   Se a janela não aparecer, no SteamVR clique no menu (≡) > "Exibir visão de VR"
+   ("Display VR View").
+
+JOY-CON 2 (Nintendo Switch 2)
+-----------------------------
+Os Joy-Cons do Switch 2 usam outro tipo de Bluetooth, então eles conectam por um
+programinha separado em vez do Bluetooth do Windows.
+
+Não precisa instalar Python nem nada: é só o JoyconVR-Joycon2.exe.
+
+1. NÃO pareie os Joy-Cons 2 nas Configurações de Bluetooth do Windows.
+   Se já pareou, remova eles de lá.
+2. Desligue o Switch 2 de verdade (senão os Joy-Cons conectam nele).
+3. Dê dois cliques em JoyconVR-Joycon2.exe. Se o Windows mostrar "O Windows
+   protegeu o computador", clique em "Mais informações" > "Executar assim mesmo".
+4. Segure o botãozinho de sincronizar de cada Joy-Con (na lateral, no trilho)
+   até o cartão dele na janela ficar "Conectado". Nas próximas vezes, é só
+   apertar qualquer botão do Joy-Con. Não toque nos analógicos enquanto conecta.
+5. Mexa os analógicos: a bolinha na janela mostra se estão funcionando.
+6. Deixe essa janela aberta (pode minimizar) e clique em "Abrir SteamVR".
+
+Com o Joy-Con 2, o botão Captura do esquerdo funciona igual (modo olhar e
+recentralizar). As luzes do Joy-Con 2 não mudam no modo olhar.
+
+Se no Joy-Con 2 a mão apontar para o lado errado, abra CONFIGURAR.bat e, na
+parte "switch2", troque "forward_axis" (teste "+x", "-x", "+y" e "-y").
+Se a mão girar menos ou mais que o seu pulso, ajuste "gyro_scale_dps".
+
+Depois de usar no PC, para voltar a usar no Switch 2 encaixe os Joy-Cons no
+console uma vez.
+
+Como segurar
+------------
+Segure cada Joy-Con em pé, como um controle de Wii:
+  * a ponta de cima (onde ficam L/ZL ou R/ZR) apontando para a tela;
+  * o analógico para cima, embaixo do polegar;
+  * o ZL / ZR embaixo do dedo indicador (é o gatilho).
+
+Controles
+---------
+  ZL / ZR ........................ gatilho
+  L / R .......................... agarrar (grip)
+  Analógicos ..................... analógico do controle
+  Clicar analógico ............... clique do analógico
+  Botões de direção / A B X Y .... botões A B X Y
+  + (direito) / - (esquerdo) ..... botão System (abre o menu do SteamVR)
+  Home (direito) ................. botão Menu do jogo
+
+  Captura (quadradinho, esquerdo):
+    - apertar rápido = liga/desliga o MODO OLHAR. Nesse modo, as 4 luzes do
+      Joy-Con acendem e o analógico esquerdo vira a câmera. Aperte de novo para
+      voltar.
+    - SEGURAR 1 segundo = RECENTRALIZAR. Faça isso com os dois Joy-Cons
+      apontando para a tela.
+
+  Mouse: segure o botão do meio (a rodinha) e mexa o mouse para olhar em volta.
+
+  Dica: a maioria dos jogos de VR também vira a visão com o analógico direito
+  ("snap turn" / "smooth turn"). Ative isso nas opções do jogo.
+
+Primeiro teste
+--------------
+Com o SteamVR aberto, aponte os Joy-Cons para a tela e segure Captura por
+1 segundo. Agora gire o pulso: as mãos devem acompanhar.
+
+Se algo estiver errado:
+  * A mão aponta para TRÁS: abra CONFIGURAR.bat e troque "forward_axis": "+x"
+    por "forward_axis": "-x" (nos dois lados, "left" e "right").
+  * A mão está de cabeça para baixo: troque "flip_up": false por true.
+  * O analógico está invertido: troque "invert_y" (ou "invert_x").
+  * A mão está muito para dentro/fora/alta/baixa: mude os números em "arm".
+  * A janela está do tamanho errado: mude "window_width"/"window_height" para a
+    resolução do seu monitor.
+  * Depois de cada mudança, feche e abra o SteamVR.
+
+  Se os analógicos estiverem imprecisos, feche o SteamVR e rode
+  CALIBRAR-ANALOGICOS.bat (as instruções aparecem em inglês).
+
+Os Joy-Cons não aparecem
+------------------------
+  * Confirme que eles estão conectados no Bluetooth do Windows.
+  * Desconecte e conecte de novo; o driver tenta reconectar a cada 2 segundos.
+  * Feche programas que também usam Joy-Con (BetterJoy, DS4Windows, Steam Input
+    com "Suporte a Switch Pro" pode atrapalhar).
+  * No SteamVR: menu (≡) > Configurações > Inicialização/Desligamento >
+    Gerenciar complementos: veja se "joyconvr" está ATIVADO.
+  * Logs: menu (≡) > Desenvolvedor > Console web, e procure por "joyconvr".
+
+Desinstalar
+-----------
+Feche o SteamVR e dê dois cliques em DESINSTALAR.bat. A configuração original
+do SteamVR fica salva em ...\Steam\config\steamvr.vrsettings.antes-do-joyconvr
+
+Créditos
+--------
+Baseado no JoyconInputOpenVR de LogicCuteGuy (licença MIT):
+https://github.com/LogicCuteGuy/JoyconInputOpenVR
+O código-fonte completo está na pasta "codigo-fonte". Licença MIT (LICENSE).

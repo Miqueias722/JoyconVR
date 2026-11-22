@@ -1,0 +1,20 @@
+{
+  "left": {
+    "x_min": 1260,
+    "x_center": 2048,
+    "x_max": 2860,
+    "y_min": 1240,
+    "y_center": 2048,
+    "y_max": 2870,
+    "deadzone": 120
+  },
+  "right": {
+    "x_min": 1260,
+    "x_center": 2048,
+    "x_max": 2860,
+    "y_min": 1240,
+    "y_center": 2048,
+    "y_max": 2870,
+    "deadzone": 120
+  }
+}

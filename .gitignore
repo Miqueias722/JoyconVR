@@ -1,0 +1,12 @@
+# Binarios vao nos Releases do GitHub, nao no codigo
+*.exe
+*.dll
+*.bak
+*.zip
+codigo-fonte/build/
+__pycache__/
+venv/
+
+# Arquivos pessoais de cada pessoa
+joycon2_config.json
+diagnostico.txt
