@@ -59,6 +59,8 @@ DEBUG_STICK = "--analogico" in sys.argv
 # A interface grafica (joyconvr_gui.py) coloca uma funcao aqui para receber eventos.
 listener = None
 ACTIVE = {}
+LOOP = None          # loop da ponte (para mandar luz/vibracao de outra thread)
+EXTEND = False       # braco esticado (o driver avisa)
 
 # Ajustes que a janela muda ao vivo (sem reiniciar o SteamVR).
 SETTINGS = {
@@ -287,6 +289,13 @@ class JoyCon2:
         self.alive = False
 
     async def command(self, cmd, sub, payload=b"", timeout=3.0):
+        # um comando por vez (a resposta chega num lugar so)
+        if not hasattr(self, "cmd_lock"):
+            self.cmd_lock = asyncio.Lock()
+        async with self.cmd_lock:
+            return await self._command(cmd, sub, payload, timeout)
+
+    async def _command(self, cmd, sub, payload=b"", timeout=3.0):
         buf = bytes([cmd, 0x91, 0x01, sub, 0x00, len(payload), 0x00, 0x00]) + payload
         self.response = asyncio.get_running_loop().create_future()
         await self.client.write_gatt_char(COMMAND_WRITE_UUID, buf)
@@ -351,6 +360,36 @@ class JoyCon2:
         if moved[self.slot] > 1200:
             self.slot_locked = True
 
+    def base_leds(self):
+        return 0x01 if self.hand == 0 else 0x03
+
+    async def set_leds(self, extend):
+        try:
+            await self.command(CMD_LEDS, SUB_LEDS_SET_PLAYER, bytes([0x0F if extend else self.base_leds(), 0, 0, 0]),
+                               timeout=1.0)
+        except Exception:  # noqa: BLE001
+            pass
+
+    async def vibrate(self, amplitude):
+        # Joy-Con 2: "vibracao pronta" (comando 0x0A, sub 0x02, tipos 1-7). Usamos fraca/forte.
+        now = time.perf_counter()
+        if now - getattr(self, "last_vibe", 0) < 0.2:
+            return
+        self.last_vibe = now
+        preset = 3 if amplitude > 0.6 else (2 if amplitude > 0.3 else 1)
+        try:
+            await self.command(0x0A, 0x02, bytes([preset, 0, 0, 0]), timeout=1.0)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def read_battery(self, data):
+        if len(data) < 33:
+            return
+        mv = u(data[31:33])
+        if 3000 <= mv <= 4500:   # so aceita valores que fazem sentido (volts de bateria de litio)
+            pct = int(max(0, min(100, (mv - 3500) / (4150 - 3500) * 100)))
+            emit("battery", hand=self.hand, percent=pct, charging=False)
+
     def on_input(self, _sender, data):
         data = bytes(data)
         self.pick_stick_slot(data)
@@ -372,6 +411,8 @@ class JoyCon2:
             raw = stick_xy(data[o:o + 3])
             log(f"{HAND_NAMES[self.hand]} analogico: bruto X={raw[0]} Y={raw[1]}  ->  X={sx:+.2f} Y={sy:+.2f}")
         self.last_report = data
+        if self.seq % 300 == 1:
+            self.read_battery(data)
         ts_us = self.timestamp_us(ts)
         try:
             sent_buttons = mirror_buttons(buttons) if SETTINGS.get("swap_hands") else buttons
@@ -469,6 +510,7 @@ class JoyCon2:
         except Exception:  # noqa: BLE001
             pass
         self.alive = True
+        await self.set_leds(EXTEND)
         emit("status", hand=self.hand, state="connected")
         log(f"{HAND_NAMES[self.hand]} CONECTADO e mandando movimento para o SteamVR.")
 
@@ -484,6 +526,8 @@ async def main():
     print(" NAO mexa nos analogicos enquanto conecta (ele mede o centro).")
     print("=" * 64, flush=True)
 
+    global LOOP
+    LOOP = asyncio.get_running_loop()
     host_mac = await get_host_mac()
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     active = ACTIVE      # address -> JoyCon2 (shared with the window, for the diagnostics)

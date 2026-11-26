@@ -22,6 +22,8 @@ public:
     bool Poll(JoyconRawState& outState, std::vector<ImuSample>& outImu);
 
     void SetPlayerLights(uint8_t pattern);
+    void SetHomeLight(uint8_t intensity);   // 0 = off, 15 = full (right Joy-Con only)
+    void Rumble(float amplitude);           // 0 = stop, 1 = strongest we allow
 
 private:
     bool SetupDevice();

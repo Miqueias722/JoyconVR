@@ -16,6 +16,7 @@ import webbrowser
 
 import joyconvr_calibrate as calibrate
 import joyconvr_pages as pages
+import joyconvr_feedback as feedback
 import joyconvr_switch1 as switch1
 import joyconvr_update as updater
 import joyconvr_switch2 as bridge
@@ -114,9 +115,20 @@ class HandCard(tk.Canvas):
         # buttons led
         self.led = self.create_oval(W - 42, 32, W - 28, 46, fill=FAINT, outline="")
         self.led_label = self.create_text(W - 48, 39, anchor="e", text="botões", fill=MUTED, font=(FONT, 8))
+        self.battery = self.create_text(W - 28, 60, anchor="e", text="", fill=MUTED, font=(FONT, 9, "bold"))
 
         self.hint = self.create_text(W / 2, H - 30, text="", fill=MUTED, font=(FONT, 9), justify="center")
         self.set_state("waiting")
+
+    def set_battery(self, percent, charging):
+        if percent is None:
+            self.itemconfig(self.battery, text="")
+            return
+        color = BAD if percent <= 15 else (WARN if percent <= 40 else OK)
+        text = f"bateria {percent}%" + (" ⚡" if charging else "")
+        if percent <= 15 and not charging:
+            text = f"bateria fraca! {percent}%"
+        self.itemconfig(self.battery, text=text, fill=color)
 
     def set_state(self, state):
         label, color, hint = STATES.get(state, STATES["waiting"])
@@ -162,7 +174,7 @@ class App:
             pass
 
         pad = tk.Frame(root, bg=BG)
-        pad.pack(padx=26, pady=22)
+        pad.pack(padx=26, pady=10)
 
         # header
         head = tk.Frame(pad, bg=BG)
@@ -182,20 +194,21 @@ class App:
         self.update_btn.pack(side="right", padx=10, pady=6)
         self.update_btn.bind("<Button-1>", lambda e: self.start_update())
         self.update_info = None
+
         threading.Thread(target=self.check_update, daemon=True).start()
 
         pages.load_settings(app_dir())
 
         # abas
         tabs = tk.Frame(pad, bg=BG)
-        tabs.pack(fill="x", pady=(14, 0))
+        tabs.pack(fill="x", pady=(8, 0))
         self.tab_buttons = {}
         for key, label in (("home", "Início"), ("controls", "Controles"), ("calibrate", "Calibrar"), ("settings", "Ajustes")):
             b = tk.Label(tabs, text=label, bg=BG, fg=MUTED, font=(FONT, 10, "bold"), padx=14, pady=6, cursor="hand2")
             b.pack(side="left")
             b.bind("<Button-1>", lambda e, k=key: self.show_page(k))
             self.tab_buttons[key] = b
-        self.content = tk.Frame(pad, bg=BG, width=626, height=520)
+        self.content = tk.Frame(pad, bg=BG, width=626, height=496)
         self.content.pack(fill="x")
         self.content.pack_propagate(False)
         self.page_home = tk.Frame(self.content, bg=BG)
@@ -207,7 +220,18 @@ class App:
 
         # steps
         steps = tk.Canvas(self.page_home, width=626, height=62, bg=BG, highlightthickness=0)
-        steps.pack(pady=(16, 14))
+        steps.pack(pady=(8, 10))
+        self.steps = steps
+        # aviso quando o SteamVR esta usando o driver de outra pasta (ou nenhum)
+        self.warn_bar = tk.Frame(self.page_home, bg="#3a1418", highlightthickness=1, highlightbackground=BAD)
+        self.warn_text = tk.Label(self.warn_bar, text="", bg="#3a1418", fg=TEXT, font=(FONT, 9),
+                                  justify="left", wraplength=470, anchor="w")
+        self.warn_text.pack(side="left", padx=12, pady=8)
+        warn_btn = tk.Label(self.warn_bar, text="Instalar driver", bg=BAD, fg="#061018",
+                            font=(FONT, 9, "bold"), padx=10, pady=4, cursor="hand2")
+        warn_btn.pack(side="right", padx=10, pady=6)
+        warn_btn.bind("<Button-1>", lambda e: self.install())
+        self.warn_shown = None
         rounded(steps, 1, 1, 625, 61, 16, fill=CARD, outline=CARD_EDGE)
         items = ["Desligue o\nSwitch 2", "Segure o botão\nde sincronizar", "Não toque nos\nanalógicos", "Abra o\nSteamVR"]
         for i, t in enumerate(items):
@@ -219,6 +243,7 @@ class App:
         # cards
         cards = tk.Frame(self.page_home, bg=BG)
         cards.pack()
+        self.cards_frame = cards
         self.cards = [HandCard(cards, 0), HandCard(cards, 1)]
         self.cards[0].pack(side="left")
         tk.Frame(cards, bg=BG, width=26).pack(side="left")
@@ -226,7 +251,7 @@ class App:
 
         # buttons
         bar = tk.Frame(pad, bg=BG)
-        bar.pack(fill="x", pady=(18, 0))
+        bar.pack(fill="x", pady=(10, 0))
         Button(bar, "Abrir SteamVR", self.open_steamvr, primary=True, width=170).pack(side="left")
         tk.Frame(bar, bg=BG, width=12).pack(side="left")
         Button(bar, "Instalar driver", self.install, width=140).pack(side="left")
@@ -239,7 +264,7 @@ class App:
         self.show_page("home")
 
         tk.Label(pad, text="Deixe esta janela aberta enquanto joga. Pode minimizar.",
-                 bg=BG, fg=MUTED, font=(FONT, 9)).pack(pady=(14, 0))
+                 bg=BG, fg=MUTED, font=(FONT, 9)).pack(pady=(6, 0))
 
         # log (escondido no comeco)
         self.log_frame = tk.Frame(pad, bg=BG)
@@ -254,6 +279,8 @@ class App:
         threading.Thread(target=self.run_bridge, daemon=True).start()
         self.stop_jc1 = threading.Event()
         threading.Thread(target=switch1.watch, args=(app_dir(), self.stop_jc1), daemon=True).start()
+        threading.Thread(target=feedback.listen, args=(self.stop_jc1,), daemon=True).start()
+        threading.Thread(target=self.watch_driver, daemon=True).start()
         root.after(30, self.poll)
 
     # --- bridge thread
@@ -282,6 +309,10 @@ class App:
                     self.update_top()
                 elif kind == "scanning":
                     self.update_top()
+                elif kind == "battery":
+                    self.cards[data["hand"]].set_battery(data["percent"], data.get("charging"))
+                elif kind == "driver_warn":
+                    self.show_warn(data["text"])
                 elif kind == "update":
                     self.show_update(data["info"])
                 elif kind == "update_progress":
@@ -354,6 +385,49 @@ class App:
         subprocess.Popen(["cmd", "/c", path], cwd=app_dir(), creationflags=subprocess.CREATE_NEW_CONSOLE)
 
     # --- atualizacao automatica
+    # --- conferir se o SteamVR carregou o driver DESTA pasta
+    def watch_driver(self):
+        import subprocess
+        import time as _t
+        mine = os.path.normcase(os.path.normpath(os.path.join(app_dir(), "joyconvr")))
+        log_path = os.path.join(r"C:\Program Files (x86)\Steam", "logs", "vrserver.txt")
+        while True:
+            text = ""
+            try:
+                out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq vrserver.exe"], capture_output=True,
+                                     text=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
+                if "vrserver.exe" in out.lower() and os.path.exists(log_path):
+                    with open(log_path, encoding="utf-8", errors="replace") as f:
+                        lines = f.readlines()[-6000:]
+                    start = max((i for i, ln in enumerate(lines) if "[vrserver] watchdogs" in ln or "Startup Complete" in ln
+                                 or "VRServer will wait" in ln), default=0)
+                    folder = None
+                    for ln in lines[start:]:
+                        if "[joyconvr] driver folder:" in ln:
+                            folder = ln.split("driver folder:", 1)[1].strip()
+                    if folder and os.path.normcase(os.path.normpath(folder)) != mine:
+                        text = ("O SteamVR está usando o JoyconVR de OUTRA pasta:\n" + folder +
+                                "\nFeche o SteamVR e clique em Instalar driver.")
+            except Exception:  # noqa: BLE001
+                pass
+            self.events.put(("driver_warn", {"text": text}))
+            _t.sleep(8)
+
+    def show_warn(self, text):
+        if text == self.warn_shown:
+            return
+        self.warn_shown = text
+        # o aviso fica no lugar das dicas, na aba Inicio (a janela precisa caber em monitores baixos)
+        if text:
+            self.warn_text.configure(text=text)
+            self.steps.pack_forget()
+            self.warn_bar.pack(fill="x", pady=(8, 10), before=self.cards_frame)
+            self.show_page("home")
+        else:
+            self.warn_bar.pack_forget()
+            if not self.steps.winfo_ismapped():
+                self.steps.pack(pady=(8, 10), before=self.cards_frame)
+
     def check_update(self):
         try:
             info = updater.check_latest()

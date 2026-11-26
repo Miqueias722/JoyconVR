@@ -109,6 +109,11 @@ class JoyCon1:
         out = bridge.out_hand(self.hand)
         sent_buttons = bridge.mirror_buttons(buttons) if bridge.SETTINGS.get("swap_hands") else buttons
         self.seq += 1
+        if self.seq % 250 == 1:
+            n = r[2] >> 4                  # 8 cheia, 6 media, 4 baixa, 2 critica, 0 vazia (+1 carregando)
+            pct = {8: 100, 6: 70, 4: 40, 2: 15, 0: 0}.get(n & 0x0E, None)
+            if pct is not None:
+                bridge.emit("battery", hand=self.hand, percent=pct, charging=bool(n & 1))
         if self.seq % 3 == 0:
             bridge.emit("input", hand=self.hand, buttons=buttons, x=sx, y=sy, rx=raw[0], ry=raw[1])
         step_us = self.sample_step_us(r[1])

@@ -30,11 +30,17 @@ struct ImuSample
 {
     int16_t accel[3] = {0, 0, 0};
     int16_t gyro[3] = {0, 0, 0};
+    // Switch 1 Joy-Con read by the driver: the report's own clock (~5 ms per step) and which of
+    // the 3 samples in the report this is, so the time between samples is right.
+    bool hasTimer = false;
+    uint8_t timer = 0;
+    uint8_t frame = 0;
 };
 
 struct JoyconRawState
 {
     bool connected = false;
+    uint8_t battery = 0xFF;   // Switch 1: high nibble of report byte 2 (8 full .. 0 empty, +1 charging)
 
     bool minus = false;
     bool plus = false;

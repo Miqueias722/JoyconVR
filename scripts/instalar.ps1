@@ -47,6 +47,17 @@ try {
         if ($Desinstalar) {
             & $vrpathreg removedriver $driverDir | Out-Null
         } else {
+            # Tira registros do JoyconVR de OUTRAS pastas (versoes antigas). Com dois registrados,
+            # o SteamVR pode carregar o antigo e nada da versao nova funciona.
+            $here = (Resolve-Path $driverDir).Path.TrimEnd('\')
+            foreach ($old in @($vrpaths.external_drivers)) {
+                if (-not $old) { continue }
+                $oldPath = ([string]$old).TrimEnd('\')
+                if ((Split-Path $oldPath -Leaf) -eq 'joyconvr' -and $oldPath -ne $here) {
+                    & $vrpathreg removedriver $oldPath | Out-Null
+                    Write-Host "Removido driver antigo: $oldPath" -ForegroundColor Yellow
+                }
+            }
             & $vrpathreg adddriver $driverDir | Out-Null
         }
     } else {

@@ -300,10 +300,19 @@ public:
     virtual vr::DriverPose_t CurrentPose() = 0;
 
     uint32_t ObjectId() const { return objectId_.load(); }
+    vr::PropertyContainerHandle_t Container() const { return container_; }
 
 protected:
     std::atomic<uint32_t> objectId_{vr::k_unTrackedDeviceIndexInvalid};
     vr::PropertyContainerHandle_t container_ = vr::k_ulInvalidPropertyContainer;
+};
+
+struct HapticRequest
+{
+    bool pending = false;
+    float amplitude = 0.0f;
+    float durationSec = 0.0f;
+    float frequency = 0.0f;
 };
 
 class Runtime
@@ -312,6 +321,7 @@ public:
     std::mutex mutex;
     Snapshot snap;
     DriverConfig config;
+    HapticRequest haptic[2];   // written by RunFrame (game asked to vibrate), used by tracking thread
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -608,6 +618,22 @@ public:
         vr::VREvent_t ev;
         while (vr::VRServerDriverHost()->PollNextEvent(&ev, sizeof(ev)))
         {
+            if (ev.eventType == vr::VREvent_Input_HapticVibration)
+            {
+                const auto& hv = ev.data.hapticVibration;
+                for (int i = 0; i < 2; ++i)
+                {
+                    if (controllers_[i] && controllers_[i]->Container() == hv.containerHandle)
+                    {
+                        std::lock_guard<std::mutex> lock(rt_.mutex);
+                        HapticRequest& r = rt_.haptic[i];
+                        r.pending = true;
+                        r.amplitude = std::max(r.amplitude, hv.fAmplitude);
+                        r.durationSec = std::max(r.durationSec, hv.fDurationSeconds);
+                        r.frequency = hv.fFrequency;
+                    }
+                }
+            }
         }
     }
 
@@ -842,8 +868,103 @@ private:
             {
                 const uint8_t base = i == 0 ? 0x01 : 0x02;
                 hids_[i].SetPlayerLights(extendMode_ ? 0x0F : base);
+                // HOME light (right Joy-Con): soft blue while connected, bright with arm stretched
+                hids_[i].SetHomeLight(extendMode_ ? 15 : 4);
             }
         }
+        SendAppState();   // the app does the same for Joy-Con 2
+    }
+
+    // ---- Messages to the app (JoyconVR-Joycon2.exe) on 127.0.0.1:27761 -------------------
+    void SendToApp(const uint8_t* data, int len)
+    {
+#ifdef _WIN32
+        if (udp_ == INVALID_SOCKET) return;
+        sockaddr_in to{};
+        to.sin_family = AF_INET;
+        to.sin_port = htons(static_cast<u_short>(rt_.config.switch2.udpPort + 1));
+        to.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        sendto(udp_, reinterpret_cast<const char*>(data), len, 0, reinterpret_cast<sockaddr*>(&to), sizeof(to));
+#endif
+    }
+
+    void SendAppState()
+    {
+        const uint8_t msg[6] = {'J', 'V', 'R', 'S', 1, static_cast<uint8_t>(extendMode_ ? 1 : 0)};
+        SendToApp(msg, sizeof(msg));
+        lastStateSend_ = std::chrono::steady_clock::now();
+    }
+
+    void SendAppHaptic(int hand, float amp, float dur, float freq)
+    {
+        uint8_t msg[18] = {'J', 'V', 'R', 'H', 1, static_cast<uint8_t>(hand)};
+        std::memcpy(msg + 6, &amp, 4);
+        std::memcpy(msg + 10, &dur, 4);
+        std::memcpy(msg + 14, &freq, 4);
+        SendToApp(msg, sizeof(msg));
+    }
+
+    // Vibration asked by the game. Switch 1 Joy-Cons are rumbled here (the driver has them open);
+    // Joy-Con 2 goes through the app, which talks to it over Bluetooth LE.
+    void ServiceHaptics(std::chrono::steady_clock::time_point now)
+    {
+        HapticRequest req[2];
+        {
+            std::lock_guard<std::mutex> lock(rt_.mutex);
+            for (int i = 0; i < 2; ++i)
+            {
+                req[i] = rt_.haptic[i];
+                rt_.haptic[i] = HapticRequest();
+            }
+        }
+        for (int i = 0; i < 2; ++i)
+        {
+            if (req[i].pending && req[i].amplitude > 0.01f)
+            {
+                const double dur = std::clamp<double>(req[i].durationSec, 0.04, 1.0);
+                if (hids_[i].IsConnected())
+                {
+                    rumbleAmp_[i] = req[i].amplitude;
+                    rumbleUntil_[i] = now + std::chrono::microseconds(static_cast<long long>(dur * 1e6));
+                    lastRumbleSend_[i] = {};
+                }
+                else if (handRt_[i].source == HandRuntime::Source::Switch2)
+                {
+                    SendAppHaptic(i, req[i].amplitude, static_cast<float>(dur), req[i].frequency);
+                }
+            }
+            if (!hids_[i].IsConnected()) continue;
+            if (now < rumbleUntil_[i])
+            {
+                if (now - lastRumbleSend_[i] > std::chrono::milliseconds(50))
+                {
+                    hids_[i].Rumble(rumbleAmp_[i]);
+                    lastRumbleSend_[i] = now;
+                    rumbling_[i] = true;
+                }
+            }
+            else if (rumbling_[i])
+            {
+                hids_[i].Rumble(0.0f);
+                rumbling_[i] = false;
+            }
+        }
+        if (now - lastStateSend_ > std::chrono::seconds(1)) SendAppState();
+    }
+
+    // Time between two gyro samples of a Switch 1 Joy-Con read by the driver. Bluetooth delivers
+    // ~45-55 reports/s (not 66), each with 3 samples, so use the report clock (~5 ms per step).
+    double HidSampleDt(int i, const ImuSample& s)
+    {
+        if (!s.hasTimer) return kImuDt;
+        if (s.frame == 0)
+        {
+            const int d = (s.timer - lastHidTimer_[i]) & 0xFF;
+            hidStepDt_[i] = (haveHidTimer_[i] && d > 0 && d <= 40) ? std::clamp(d * 0.00496 / 3.0, 0.001, 0.025) : kImuDt;
+            lastHidTimer_[i] = s.timer;
+            haveHidTimer_[i] = true;
+        }
+        return hidStepDt_[i];
     }
 
     void HandleButtons(const JoyconRawState raw[2], double dt)
@@ -994,7 +1115,7 @@ private:
                     hids_[i].Poll(raw[i], imu);
                     for (const ImuSample& s : imu)
                     {
-                        trackers_[i].AddSample(s, kImuDt);
+                        trackers_[i].AddSample(s, HidSampleDt(i, s));
                     }
                 }
 
@@ -1027,6 +1148,7 @@ private:
             }
 
             CheckConfigReload();
+            ServiceHaptics(now);
             HandleButtons(raw, dt);
             UpdateHmdPose();
 
@@ -1120,6 +1242,13 @@ private:
     double headPitch_ = 0.0;
     bool lookMode_ = false;
     bool extendMode_ = false;   // arms stretched forward (Capture held)
+    std::chrono::steady_clock::time_point lastStateSend_{};
+    std::chrono::steady_clock::time_point rumbleUntil_[2]{}, lastRumbleSend_[2]{};
+    float rumbleAmp_[2] = {0.0f, 0.0f};
+    bool rumbling_[2] = {false, false};
+    uint8_t lastHidTimer_[2] = {0, 0};
+    bool haveHidTimer_[2] = {false, false};
+    double hidStepDt_[2] = {0.005, 0.005};
 #ifdef _WIN32
     bool mouseHeld_ = false;
     POINT lastMouse_{};

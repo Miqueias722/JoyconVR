@@ -1,4 +1,6 @@
 #include "JoyconHid.h"
+#include <cmath>
+#include <algorithm>
 
 #include <hidapi.h>
 
@@ -133,6 +135,8 @@ bool JoyconHid::SetupDevice()
     {
         return false;
     }
+    const uint8_t vibrationOn = 0x01;
+    SendSubcommand(0x48, &vibrationOn, 1, true);  // allow rumble
 
     uint8_t mode = 0x30;                          // standard full report, includes IMU frames
     if (!SendSubcommand(0x03, &mode, 1, true))
@@ -148,6 +152,62 @@ bool JoyconHid::SetupDevice()
 void JoyconHid::SetPlayerLights(uint8_t pattern)
 {
     SendSubcommand(0x30, &pattern, 1, false);
+}
+
+void JoyconHid::SetHomeLight(uint8_t intensity)
+{
+    if (hand_ != JoyconHand::Right) return;   // only the right Joy-Con has a HOME light
+    const uint8_t i = static_cast<uint8_t>(std::min<int>(intensity, 15));
+    // Same pattern SDL uses: one cycle at the wanted intensity, then stay there.
+    const uint8_t data[4] = {0x01, static_cast<uint8_t>(i << 4), static_cast<uint8_t>(i << 4), 0x00};
+    SendSubcommand(0x38, data, sizeof(data), false);
+}
+
+namespace
+{
+// Joy-Con rumble encoding (frequency + amplitude -> 4 bytes), as documented by dekuNukem and
+// used by JoyconLib. Amplitude is capped low on purpose: strong rumble drains the battery and can
+// flood the Bluetooth link.
+void EncodeRumble(float lowFreq, float highFreq, float amp, uint8_t out[4])
+{
+    amp = std::clamp(amp, 0.0f, 0.6f);
+    if (amp <= 0.0f)
+    {
+        out[0] = 0x00; out[1] = 0x01; out[2] = 0x40; out[3] = 0x40;
+        return;
+    }
+    int hf = static_cast<int>(std::lround(std::log2(highFreq / 10.0f) * 32.0f));
+    hf = (hf - 0x60) * 4;
+    const int lf = static_cast<int>(std::lround(std::log2(lowFreq / 10.0f) * 32.0f)) - 0x40;
+    float hfAmpF;
+    if (amp < 0.117f) hfAmpF = (std::log2(amp * 1000.0f) * 32.0f - 0x60) / (5.0f - amp * amp) - 1.0f;
+    else if (amp < 0.23f) hfAmpF = std::log2(amp * 1000.0f) * 32.0f - 0x60 - 0x5c;
+    else hfAmpF = (std::log2(amp * 1000.0f) * 32.0f - 0x60) * 2.0f - 0xf6;
+    const int hfAmp = std::max(0, static_cast<int>(std::lround(hfAmpF)));
+    int lfAmp = static_cast<int>(std::lround(hfAmpF * 0.5f));
+    const int parity = lfAmp % 2;
+    if (parity > 0) --lfAmp;
+    lfAmp = (lfAmp >> 1) + 0x40;
+    if (parity > 0) lfAmp |= 0x8000;
+    out[0] = static_cast<uint8_t>(hf & 0xFF);
+    out[1] = static_cast<uint8_t>(((hf >> 8) & 0xFF) + hfAmp);
+    out[2] = static_cast<uint8_t>(lf + ((lfAmp >> 8) & 0xFF));
+    out[3] = static_cast<uint8_t>(lfAmp & 0xFF);
+}
+} // namespace
+
+void JoyconHid::Rumble(float amplitude)
+{
+    if (device_ == nullptr) return;
+    uint8_t out[kPacketSize] = {};
+    out[0] = 0x10;                      // rumble-only output report
+    out[1] = packetCounter_;
+    packetCounter_ = static_cast<uint8_t>((packetCounter_ + 1) & 0x0F);
+    uint8_t side[4];
+    EncodeRumble(160.0f, 320.0f, amplitude, side);
+    std::memcpy(&out[2], side, 4);      // left actuator bytes
+    std::memcpy(&out[6], side, 4);      // right actuator bytes
+    hid_write(device_, out, 10);
 }
 
 void JoyconHid::ParseInputReport(const uint8_t* report, size_t len, JoyconRawState& outState, std::vector<ImuSample>& outImu) const
@@ -198,6 +258,7 @@ void JoyconHid::ParseInputReport(const uint8_t* report, size_t len, JoyconRawSta
         outState.stick = (shared & 0x04) != 0;   // right stick click
     }
 
+    outState.battery = static_cast<uint8_t>(report[2] >> 4);
     const uint8_t* s = hand_ == JoyconHand::Left ? &report[6] : &report[9];
     outState.rawStickX = static_cast<uint16_t>(s[0] | ((s[1] & 0x0F) << 8));
     outState.rawStickY = static_cast<uint16_t>((s[1] >> 4) | (s[2] << 4));
@@ -214,6 +275,9 @@ void JoyconHid::ParseInputReport(const uint8_t* report, size_t len, JoyconRawSta
             sample.gyro[0] = ReadInt16(p + 6);
             sample.gyro[1] = ReadInt16(p + 8);
             sample.gyro[2] = ReadInt16(p + 10);
+            sample.hasTimer = true;
+            sample.timer = report[1];
+            sample.frame = static_cast<uint8_t>(frame);
             outImu.push_back(sample);
         }
     }
