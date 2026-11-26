@@ -93,7 +93,12 @@ void MotionTracker::AddSample(const ImuSample& s, double dt)
     const double angle = omega.Length() * dt;
     if (angle > 1e-12)
     {
-        q_ = (q_ * Quat::AxisAngle(omega, angle)).Normalized();
+        const Quat next = (q_ * Quat::AxisAngle(omega, angle)).Normalized();
+        // never keep a broken (NaN) orientation: drop the sample instead
+        if (std::isfinite(next.w) && std::isfinite(next.x) && std::isfinite(next.y) && std::isfinite(next.z))
+        {
+            q_ = next;
+        }
     }
 }
 

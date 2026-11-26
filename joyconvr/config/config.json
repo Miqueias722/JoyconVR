@@ -58,7 +58,7 @@
     "gyro_scale_dps": 0.0609,   // se girar 90° e a mão girar menos/mais, ajuste aqui
     "invert_x": false,
     "invert_y": false,
-    "analog_deadzone": 0.0,   // a zona morta do Joy-Con 2 agora fica na janela (aba Ajustes)
+    "analog_deadzone": 0.02,  // a zona morta de verdade fica na janela (aba Ajustes); nao use 0
     // Se a mão apontar para trás, troque "+y" por "-y". Se não subir/descer, teste "+x" ou "-x"
     "left":  { "forward_axis": "+y", "flip_up": false },
     "right": { "forward_axis": "+y", "flip_up": false }

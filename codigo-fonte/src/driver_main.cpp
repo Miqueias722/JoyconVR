@@ -109,9 +109,11 @@ std::array<float, 2> StickValue(const JoyconRawState& s, const HandConfig& cfg, 
 {
     if (s.hasNormStick)
     {
-        float x = s.normStickX, y = s.normStickY;
+        float x = std::isfinite(s.normStickX) ? s.normStickX : 0.0f;
+        float y = std::isfinite(s.normStickY) ? s.normStickY : 0.0f;
         const float r = std::sqrt(x * x + y * y);
-        if (r < sw2.analogDeadzone)
+        // r == 0 with a zero deadzone used to divide 0 by 0 (NaN), which broke every pose.
+        if (r < std::max(sw2.analogDeadzone, 1e-4f) || sw2.analogDeadzone >= 0.99f)
         {
             x = y = 0.0f;
         }
@@ -896,6 +898,9 @@ private:
 #endif
 
         const double maxPitch = look.maxPitchDeg * M_PI / 180.0;
+        // Safety net: a broken number must never get stuck in the camera.
+        if (!std::isfinite(headYaw_)) headYaw_ = 0.0;
+        if (!std::isfinite(headPitch_)) headPitch_ = 0.0;
         headPitch_ = std::clamp(headPitch_, -maxPitch, maxPitch);
         headYaw_ = std::remainder(headYaw_, 2.0 * M_PI);
 
