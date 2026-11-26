@@ -14,6 +14,7 @@ import threading
 import tkinter as tk
 import webbrowser
 
+import joyconvr_calibrate as calibrate
 import joyconvr_pages as pages
 import joyconvr_switch1 as switch1
 import joyconvr_update as updater
@@ -189,7 +190,7 @@ class App:
         tabs = tk.Frame(pad, bg=BG)
         tabs.pack(fill="x", pady=(14, 0))
         self.tab_buttons = {}
-        for key, label in (("home", "Início"), ("controls", "Controles"), ("settings", "Ajustes")):
+        for key, label in (("home", "Início"), ("controls", "Controles"), ("calibrate", "Calibrar"), ("settings", "Ajustes")):
             b = tk.Label(tabs, text=label, bg=BG, fg=MUTED, font=(FONT, 10, "bold"), padx=14, pady=6, cursor="hand2")
             b.pack(side="left")
             b.bind("<Button-1>", lambda e, k=key: self.show_page(k))
@@ -200,7 +201,9 @@ class App:
         self.page_home = tk.Frame(self.content, bg=BG)
         self.page_controls = pages.ControlsPage(self.content, app_dir(), self.add_log)
         self.page_settings = pages.SettingsPage(self.content, app_dir(), self.configure)
-        self.pages = {"home": self.page_home, "controls": self.page_controls, "settings": self.page_settings}
+        self.page_calibrate = calibrate.CalibratePage(self.content, app_dir(), lambda: pages.save_settings(app_dir()))
+        self.pages = {"home": self.page_home, "controls": self.page_controls, "calibrate": self.page_calibrate,
+                      "settings": self.page_settings}
 
         # steps
         steps = tk.Canvas(self.page_home, width=626, height=62, bg=BG, highlightthickness=0)
@@ -274,6 +277,8 @@ class App:
                     self.cards[data["hand"]].set_state(data["state"])
                     self.cards[data["hand"]].itemconfig(self.cards[data["hand"]].model,
                                                         text=data.get("model", "Joy-Con 2"))
+                    connected = data["state"] == "connected"
+                    self.page_calibrate.set_model(data["hand"], data.get("model", "Joy-Con 2") if connected else "")
                     self.update_top()
                 elif kind == "scanning":
                     self.update_top()
@@ -304,6 +309,7 @@ class App:
                 self.update_top()
             card.set_input(d["buttons"], d["x"], d["y"], d.get("rx"), d.get("ry"))
             self.page_controls.show_buttons(hand, d["buttons"])
+            self.page_calibrate.feed(hand, d.get("rx"), d.get("ry"))
         self.root.after(30, self.poll)
 
     def update_top(self):

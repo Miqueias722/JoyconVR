@@ -1,7 +1,7 @@
 @echo off
-echo Esta calibracao e SO para Joy-Con do Switch 1.
-echo Joy-Con 2 do Switch 2 NAO precisa: ele calibra sozinho ao conectar no JoyconVR-Joycon2.exe.
+echo Agora da para calibrar de um jeito mais facil:
+echo abra o JoyconVR-Joycon2.exe e use a aba "Calibrar".
 echo.
-echo Feche o SteamVR antes de calibrar.
+echo Se preferir o jeito antigo (so Joy-Con 1), feche o SteamVR e aperte uma tecla.
 pause
-"%~dp0joyconvr\bin\win64\joycon_calibrate.exe"
+"%~dp0joyconvrin\win64\joycon_calibrate.exe"

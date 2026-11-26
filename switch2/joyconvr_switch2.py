@@ -420,6 +420,11 @@ class JoyCon2:
 
         await self.client.start_notify(COMMAND_RESPONSE_UUID, self.on_response)
         await self.read_calibration()
+        saved = (SETTINGS.get("cal2") or [None, None])[self.hand]
+        if saved:
+            import joyconvr_calibrate
+            joyconvr_calibrate.apply_manual_cal(self.cal, saved)
+            self.cal_info = getattr(self, "cal_info", "") + " | calibracao manual da janela"
         if needs_pairing:
             await self.pair()
             log(f"{HAND_NAMES[self.hand]} pareado com este PC.")
