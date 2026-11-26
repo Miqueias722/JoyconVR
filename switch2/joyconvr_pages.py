@@ -186,7 +186,7 @@ class ControlsPage(tk.Frame):
             head = tk.Frame(col, bg=CARD)
             head.pack(fill="x", padx=12, pady=(10, 6))
             tk.Frame(head, bg=color, width=5, height=22).pack(side="left")
-            tk.Label(head, text=" Joy-Con 2 " + ("ESQUERDO" if hand == 0 else "DIREITO"), bg=CARD, fg=TEXT,
+            tk.Label(head, text=" Joy-Con " + ("ESQUERDO" if hand == 0 else "DIREITO"), bg=CARD, fg=TEXT,
                      font=(FONT, 11, "bold")).pack(side="left")
             tk.Label(head, text="→  VR", bg=CARD, fg=MUTED, font=(FONT, 9)).pack(side="right")
             for name, key, bit in JOYCON_BUTTONS[hand]:

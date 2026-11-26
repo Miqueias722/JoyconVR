@@ -5,7 +5,7 @@ Use **Joy-Cons** (Switch 1 e **Joy-Con 2** do Switch 2) como controles de VR no 
 ## Baixar
 Vá em **[Releases](../../releases/latest)** e baixe o `JoyconVR.zip`. Extraia numa pasta fixa (ex.: `C:\JoyconVR`) e leia o `LEIA-ME.txt`.
 
-- **Joy-Con 1 (Switch 1):** pareie no Bluetooth do Windows, rode `INSTALAR.bat` e abra o SteamVR.
+- **Joy-Con 1 (Switch 1):** pareie no Bluetooth do Windows, rode `INSTALAR.bat` e abra o `JoyconVR-Joycon2.exe` (ele mostra e ajusta o Joy-Con 1 também). Sem a janela aberta, o SteamVR lê o Joy-Con 1 direto, como antes.
 - **Joy-Con 2 (Switch 2):** rode `INSTALAR.bat` e abra o `JoyconVR-Joycon2.exe` (não precisa de Python).
 
 O `JoyconVR-Joycon2.exe` avisa sozinho quando há versão nova e se atualiza com um clique, mantendo seus ajustes.

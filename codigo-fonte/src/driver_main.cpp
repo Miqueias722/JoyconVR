@@ -618,6 +618,7 @@ private:
         uint32_t lastTimestamp = 0;
         bool haveTimestamp = false;
         std::chrono::steady_clock::time_point lastUdpSample{};
+        bool udpJoycon1 = false;   // the app is sending a Switch 1 Joy-Con (Switch 1 IMU settings)
     };
 
     void ConfigureTracker(int i, bool switch2Source)
@@ -677,7 +678,7 @@ private:
         bool axisChanged[2];
         for (int i = 0; i < 2; ++i)
         {
-            const bool sw2 = handRt_[i].source == HandRuntime::Source::Switch2;
+            const bool sw2 = handRt_[i].source == HandRuntime::Source::Switch2 && !handRt_[i].udpJoycon1;
             const auto& oldH = i == 0 ? rt_.config.left : rt_.config.right;
             const auto& newH = i == 0 ? fresh.left : fresh.right;
             const auto& oldS = i == 0 ? rt_.config.switch2.left : rt_.config.switch2.right;
@@ -691,7 +692,7 @@ private:
         }
         for (int i = 0; i < 2; ++i)
         {
-            ConfigureTracker(i, handRt_[i].source == HandRuntime::Source::Switch2);
+            ConfigureTracker(i, handRt_[i].source == HandRuntime::Source::Switch2 && !handRt_[i].udpJoycon1);
             if (axisChanged[i]) trackers_[i].Recenter();
         }
         DriverLog("config.json reloaded (live)");
@@ -743,19 +744,21 @@ private:
             Switch2Packet p;
             if (!switch2::Parse(buf, static_cast<size_t>(n), p)) continue;
             const int i = p.hand == JoyconHand::Left ? 0 : 1;
-            if (hids_[i].IsConnected()) continue; // a Switch 1 Joy-Con on this hand wins
+            // The app (JoyconVR-Joycon2.exe) wins over the driver's own HID reading: it applies
+            // the player's settings. Without the app, Switch 1 Joy-Cons are read directly (HID).
             HandRuntime& h = handRt_[i];
             const auto now = std::chrono::steady_clock::now();
             h.lastUdp = now;
             h.udpConnected = p.connected;
             if (!p.connected) continue;
 
-            if (h.source != HandRuntime::Source::Switch2)
+            if (h.source != HandRuntime::Source::Switch2 || h.udpJoycon1 != p.joycon1)
             {
                 h.source = HandRuntime::Source::Switch2;
+                h.udpJoycon1 = p.joycon1;
                 h.haveTimestamp = false;
-                ResetTracker(i, true);
-                DriverLog("%s Joy-Con 2 connected (bridge)", i == 0 ? "left" : "right");
+                ResetTracker(i, !p.joycon1);
+                DriverLog("%s %s connected (app)", i == 0 ? "left" : "right", p.joycon1 ? "Joy-Con 1" : "Joy-Con 2");
             }
 
             switch2::ToRawState(p, raw[i]);
@@ -942,8 +945,15 @@ private:
                     }
                 }
 
-                if (hids_[i].IsConnected())
+                const bool appActive = handRt_[i].source == HandRuntime::Source::Switch2 &&
+                                       now - handRt_[i].lastUdp < std::chrono::seconds(1);
+                if (hids_[i].IsConnected() && !appActive)
                 {
+                    if (handRt_[i].source != HandRuntime::Source::Hid)
+                    {
+                        handRt_[i].source = HandRuntime::Source::Hid;
+                        ResetTracker(i, false);
+                    }
                     imu.clear();
                     raw[i].hasNormStick = false;
                     hids_[i].Poll(raw[i], imu);
@@ -956,7 +966,7 @@ private:
                 if (wasConnected[i] && !hids_[i].IsConnected())
                 {
                     DriverLog("%s Joy-Con disconnected", i == 0 ? "left" : "right");
-                    handRt_[i].source = HandRuntime::Source::None;
+                    if (handRt_[i].source == HandRuntime::Source::Hid) handRt_[i].source = HandRuntime::Source::None;
                 }
                 wasConnected[i] = hids_[i].IsConnected();
             }
@@ -971,7 +981,7 @@ private:
                 if (h.source == HandRuntime::Source::Switch2 &&
                     (!h.udpConnected || now - h.lastUdp > std::chrono::seconds(1)))
                 {
-                    DriverLog("%s Joy-Con 2 disconnected", i == 0 ? "left" : "right");
+                    DriverLog("%s Joy-Con disconnected from the app", i == 0 ? "left" : "right");
                     h.source = HandRuntime::Source::None;
                     raw[i] = JoyconRawState();
                 }

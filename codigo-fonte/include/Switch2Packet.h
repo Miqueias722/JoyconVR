@@ -6,7 +6,7 @@
 //   4  u8       version (1)
 //   5  u8       hand (0 = left, 1 = right)
 //   6  u8       connected (1/0)
-//   7  u8       reserved
+//   7  u8       source: 0 = Joy-Con 2 (Switch 2), 1 = Joy-Con 1 read by the app (raw Switch 1 IMU)
 //   8  u32      Switch 2 button bitmask (as reported by the controller)
 //  12  f32      stick X, normalized -1..1 (calibrated with the controller's own calibration)
 //  16  f32      stick Y, normalized -1..1, +1 = up
@@ -24,6 +24,7 @@ struct Switch2Packet
 {
     JoyconHand hand = JoyconHand::Left;
     bool connected = false;
+    bool joycon1 = false;
     uint32_t buttons = 0;
     float stickX = 0.0f;
     float stickY = 0.0f;
@@ -56,6 +57,7 @@ inline bool Parse(const uint8_t* d, size_t len, Switch2Packet& out)
 
     out.hand = d[5] == 0 ? JoyconHand::Left : JoyconHand::Right;
     out.connected = d[6] != 0;
+    out.joycon1 = d[7] == 1;
     out.buttons = u32(8);
     out.stickX = f32(12);
     out.stickY = f32(16);

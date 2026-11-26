@@ -15,6 +15,7 @@ import tkinter as tk
 import webbrowser
 
 import joyconvr_pages as pages
+import joyconvr_switch1 as switch1
 import joyconvr_update as updater
 import joyconvr_switch2 as bridge
 
@@ -89,7 +90,7 @@ class HandCard(tk.Canvas):
         W, H = self.W, self.H
         rounded(self, 2, 2, W - 2, H - 2, 22, fill=CARD, outline=CARD_EDGE)
         self.create_rectangle(24, 22, 30, 50, fill=self.color, outline="")
-        self.create_text(42, 26, anchor="nw", text="Joy-Con 2", fill=MUTED, font=(FONT, 9))
+        self.model = self.create_text(42, 26, anchor="nw", text="Joy-Con", fill=MUTED, font=(FONT, 9))
         self.create_text(42, 40, anchor="nw", text="ESQUERDO" if hand == 0 else "DIREITO",
                          fill=TEXT, font=(FONT, 14, "bold"))
 
@@ -166,7 +167,7 @@ class App:
         head = tk.Frame(pad, bg=BG)
         head.pack(fill="x")
         tk.Label(head, text="JoyconVR", bg=BG, fg=TEXT, font=(FONT, 22, "bold")).pack(side="left")
-        tk.Label(head, text="  Joy-Con 2 para SteamVR", bg=BG, fg=MUTED, font=(FONT, 11)).pack(side="left", pady=(10, 0))
+        tk.Label(head, text="  Joy-Con 1 e 2 para SteamVR", bg=BG, fg=MUTED, font=(FONT, 11)).pack(side="left", pady=(10, 0))
         self.top_status = tk.Label(head, text="Iniciando Bluetooth...", bg=BG, fg=MUTED, font=(FONT, 9))
         self.top_status.pack(side="right", pady=(10, 0))
         tk.Label(head, text=f"  v{updater.VERSION}", bg=BG, fg=FAINT, font=(FONT, 9)).pack(side="left", pady=(12, 0))
@@ -248,6 +249,8 @@ class App:
 
         root.protocol("WM_DELETE_WINDOW", self.quit)
         threading.Thread(target=self.run_bridge, daemon=True).start()
+        self.stop_jc1 = threading.Event()
+        threading.Thread(target=switch1.watch, args=(app_dir(), self.stop_jc1), daemon=True).start()
         root.after(30, self.poll)
 
     # --- bridge thread
@@ -269,6 +272,8 @@ class App:
                     latest_input[data["hand"]] = data
                 elif kind == "status":
                     self.cards[data["hand"]].set_state(data["state"])
+                    self.cards[data["hand"]].itemconfig(self.cards[data["hand"]].model,
+                                                        text=data.get("model", "Joy-Con 2"))
                     self.update_top()
                 elif kind == "scanning":
                     self.update_top()
@@ -400,7 +405,7 @@ class App:
             except Exception as e:  # noqa: BLE001
                 parts.append(f"(erro lendo {jc}: {e})")
         if not bridge.ACTIVE:
-            parts.append("Nenhum Joy-Con 2 conectado agora.")
+            parts.append("Nenhum Joy-Con conectado na janela agora.")
         try:
             cfg = open(os.path.join(app_dir(), "joyconvr", "config", "config.json"), encoding="utf-8").read()
             i = cfg.find('"switch2"')
