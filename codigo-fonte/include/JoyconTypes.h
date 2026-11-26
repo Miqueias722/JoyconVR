@@ -176,6 +176,12 @@ struct Switch2Config
     Switch2HandConfig right;
 };
 
+struct VibrationConfig
+{
+    bool enabled = true;
+    float strength = 1.0f;   // 0..1, multiplies what the game asks for
+};
+
 struct DriverConfig
 {
     std::string joyConCalPath = "config/joyconcal.json";
@@ -187,4 +193,5 @@ struct DriverConfig
     ArmConfig arm;
     ImuConfig imu;
     Switch2Config switch2;
+    VibrationConfig vibration;
 };

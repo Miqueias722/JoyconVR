@@ -185,6 +185,12 @@ DriverConfig JoyconConfig::LoadFromFile(const std::string& configPath, std::stri
         m.predictionMs = it->value("prediction_ms", m.predictionMs);
     }
 
+    if (auto it = j.find("vibration"); it != j.end() && it->is_object())
+    {
+        config.vibration.enabled = it->value("enabled", config.vibration.enabled);
+        config.vibration.strength = it->value("strength", config.vibration.strength);
+    }
+
     if (auto it = j.find("switch2"); it != j.end() && it->is_object())
     {
         Switch2Config& c = config.switch2;

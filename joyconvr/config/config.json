@@ -54,6 +54,9 @@
   },
 
   // Joy-Con 2 (Switch 2): eles conectam pelo programa JoyconVR-Joycon2.exe
+  // Vibracao dos Joy-Cons quando o jogo vibra o controle
+  "vibration": { "enabled": true, "strength": 1.0 },
+
   "switch2": {
     "enabled": true,
     "udp_port": 27760,

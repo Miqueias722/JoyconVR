@@ -107,6 +107,30 @@ def read_number(app_dir, section, key, default):
         return default
 
 
+def read_vibration(app_dir):
+    try:
+        with open(driver_config_path(app_dir), encoding="utf-8") as f:
+            cfg = json.loads(strip_comments(f.read()))
+        v = cfg.get("vibration", {})
+        return bool(v.get("enabled", True)), float(v.get("strength", 1.0))
+    except Exception:  # noqa: BLE001
+        return True, 1.0
+
+
+def write_vibration(app_dir, enabled, strength):
+    """Grava a vibracao no config.json do driver (cria a parte se o arquivo for de versao antiga)."""
+    path = driver_config_path(app_dir)
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    line = f'"vibration": {{ "enabled": {"true" if enabled else "false"}, "strength": {strength:g} }}'
+    new, n = re.subn(r'"vibration"\s*:\s*\{[^}]*\}', line, text)
+    if n == 0:
+        start = text.index("{") + 1          # logo depois da primeira chave do arquivo
+        new = text[:start] + "\n  " + line + "," + text[start:]
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(new)
+
+
 def write_number_all(app_dir, key, value):
     """Troca o numero de TODAS as linhas "key": numero (ex.: as duas maos)."""
     path = driver_config_path(app_dir)
@@ -276,7 +300,7 @@ class SettingsPage(tk.Frame):
         top = tk.Frame(self, bg=CARD, highlightthickness=1, highlightbackground=CARD_EDGE)
         top.pack(fill="x")
         inner = tk.Frame(top, bg=CARD)
-        inner.pack(fill="x", padx=14, pady=10)
+        inner.pack(fill="x", padx=14, pady=6)
         tk.Label(inner, text="Geral", bg=CARD, fg=TEXT, font=(FONT, 11, "bold")).grid(row=0, column=0, sticky="w")
         self.swap = tk.BooleanVar(value=S["swap_hands"])
         self._check(inner, "Trocar mãos (use se o analógico ou a mão estiver do lado errado)", self.swap,
@@ -290,14 +314,14 @@ class SettingsPage(tk.Frame):
                     lambda v: self.set("gyro_sensitivity", float(v))).grid(row=3, column=1, sticky="w", pady=(6, 0))
 
         cols = tk.Frame(self, bg=BG)
-        cols.pack(fill="x", pady=(12, 0))
+        cols.pack(fill="x", pady=(6, 0))
         self.stick_vars = []
         for hand in (0, 1):
             s = S["sticks"][hand]
             card = tk.Frame(cols, bg=CARD, highlightthickness=1, highlightbackground=CARD_EDGE)
             card.pack(side="left", padx=(0, 14) if hand == 0 else 0, fill="both", expand=True)
             f = tk.Frame(card, bg=CARD)
-            f.pack(fill="both", padx=14, pady=10)
+            f.pack(fill="both", padx=14, pady=6)
             color = LEFT_COLOR if hand == 0 else RIGHT_COLOR
             h = tk.Frame(f, bg=CARD)
             h.grid(row=0, column=0, columnspan=2, sticky="w")
@@ -330,9 +354,9 @@ class SettingsPage(tk.Frame):
 
         # Ajustes do driver (servem para Joy-Con 1 e 2; o driver novo aplica sem reiniciar)
         drv = tk.Frame(self, bg=CARD, highlightthickness=1, highlightbackground=CARD_EDGE)
-        drv.pack(fill="x", pady=(12, 0))
+        drv.pack(fill="x", pady=(6, 0))
         d = tk.Frame(drv, bg=CARD)
-        d.pack(fill="x", padx=14, pady=8)
+        d.pack(fill="x", padx=14, pady=5)
         tk.Label(d, text="Driver  (Joy-Con 1 e 2)", bg=CARD, fg=TEXT, font=(FONT, 11, "bold")).grid(
             row=0, column=0, columnspan=4, sticky="w")
         arm = read_number(app_dir, "arm", "upper_arm", ARM_DEFAULT[0]) / ARM_DEFAULT[0]
@@ -355,11 +379,20 @@ class SettingsPage(tk.Frame):
         self._scale(d, 0.1, 0.8, 0.05, reach, self.set_reach, 160).grid(row=3, column=1, sticky="w")
         tk.Label(d, text="(segure o Captura para esticar)", bg=CARD, fg=FAINT, font=(FONT, 8)).grid(
             row=3, column=2, columnspan=2, sticky="w", padx=(12, 0))
+        vib_on, vib_strength = read_vibration(app_dir)
+        self.vib_on = tk.BooleanVar(value=vib_on)
+        self.vib_strength = vib_strength
+        tk.Checkbutton(d, text="Vibração", variable=self.vib_on, command=self.set_vibration, bg=CARD, fg=TEXT,
+                       selectcolor=BG, activebackground=CARD, activeforeground=TEXT, font=(FONT, 9), bd=0,
+                       highlightthickness=0, cursor="hand2").grid(row=4, column=0, sticky="w")
+        tk.Label(d, text="Força da vibração", bg=CARD, fg=MUTED, font=(FONT, 9)).grid(
+            row=4, column=2, sticky="w", padx=(12, 0))
+        self._scale(d, 0.1, 1.0, 0.05, vib_strength, self.set_vib_strength, 160).grid(row=4, column=3, sticky="w")
         self.driver_status = tk.Label(d, text="", bg=CARD, fg=MUTED, font=(FONT, 8))
-        self.driver_status.grid(row=4, column=0, columnspan=4, sticky="w")
+        self.driver_status.grid(row=5, column=0, columnspan=4, sticky="w")
 
         bar = tk.Frame(self, bg=BG)
-        bar.pack(fill="x", pady=(10, 0))
+        bar.pack(fill="x", pady=(6, 0))
         tk.Label(bar, text="Estes ajustes valem na hora, sem reiniciar o SteamVR.", bg=BG, fg=OK,
                  font=(FONT, 9)).pack(side="left")
         tk.Button(bar, text="Config. avançada do driver", command=open_advanced, bg=CARD, fg=TEXT, bd=0, padx=12,
@@ -395,6 +428,17 @@ class SettingsPage(tk.Frame):
     def set_camera(self, k):
         self._driver([("look", "yaw_speed_deg", round(140 * k)), ("look", "pitch_speed_deg", round(90 * k))])
 
+    def set_vib_strength(self, value):
+        self.vib_strength = value
+        self.set_vibration()
+
+    def set_vibration(self):
+        try:
+            write_vibration(self.app_dir, self.vib_on.get(), round(self.vib_strength, 2))
+            self.driver_status.configure(text="salvo ✓", fg=OK)
+        except Exception as e:  # noqa: BLE001
+            self.driver_status.configure(text=f"erro: {e}", fg="#ff5b6b")
+
     def set_reach(self, meters):
         # o esticar vale para as duas maos: troca todos os "extend_distance" do arquivo
         if getattr(self, "_pending_reach", None):
@@ -426,7 +470,7 @@ class SettingsPage(tk.Frame):
 
 class Slider(tk.Canvas):
     """Controle deslizante desenhado (o do tkinter fica feio no tema escuro)."""
-    W, H, PAD = 200, 28, 10
+    W, H, PAD = 200, 24, 10
 
     def __init__(self, parent, lo, hi, step, value, cmd, width=200):
         self.W = width

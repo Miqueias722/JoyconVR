@@ -944,6 +944,8 @@ private:
         }
         for (int i = 0; i < 2; ++i)
         {
+            const auto& vib = rt_.config.vibration;
+            req[i].amplitude *= vib.enabled ? std::clamp(vib.strength, 0.0f, 1.0f) : 0.0f;
             if (req[i].pending && req[i].amplitude > 0.01f)
             {
                 const double dur = std::clamp<double>(req[i].durationSec, 0.04, 1.0);
