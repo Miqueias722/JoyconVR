@@ -42,7 +42,7 @@
     "shoulder_z": 0.05,
     "upper_arm": 0.28,
     "forearm": 0.30,
-    "elbow_follow": 0.35
+    "elbow_follow": 0.8
   },
 
   "imu": {

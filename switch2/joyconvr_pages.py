@@ -333,8 +333,12 @@ class SettingsPage(tk.Frame):
         self._scale(d, 0.4, 2.5, 0.05, yaw / 140, self.set_camera, 160).grid(row=1, column=3, sticky="w")
         tk.Label(d, text="Giro (Joy-Con 1)", bg=CARD, fg=MUTED, font=(FONT, 9)).grid(row=2, column=0, sticky="w")
         self._scale(d, 0.5, 2.0, 0.05, gyro1, self.set_gyro1, 160).grid(row=2, column=1, sticky="w")
+        elbow = read_number(app_dir, "arm", "elbow_follow", 0.8)
+        tk.Label(d, text="Levantar o braço", bg=CARD, fg=MUTED, font=(FONT, 9)).grid(
+            row=2, column=2, sticky="w", padx=(12, 0))
+        self._scale(d, 0.1, 1.0, 0.05, elbow, self.set_elbow, 160).grid(row=2, column=3, sticky="w")
         self.driver_status = tk.Label(d, text="", bg=CARD, fg=MUTED, font=(FONT, 8))
-        self.driver_status.grid(row=2, column=2, columnspan=2, sticky="w", padx=(12, 0))
+        self.driver_status.grid(row=3, column=0, columnspan=4, sticky="w")
 
         bar = tk.Frame(self, bg=BG)
         bar.pack(fill="x", pady=(10, 0))
@@ -372,6 +376,10 @@ class SettingsPage(tk.Frame):
 
     def set_camera(self, k):
         self._driver([("look", "yaw_speed_deg", round(140 * k)), ("look", "pitch_speed_deg", round(90 * k))])
+
+    def set_elbow(self, k):
+        # quanto o cotovelo acompanha o Joy-Con: maior = a mao sobe mais quando voce aponta pra cima
+        self._driver([("arm", "elbow_follow", round(k, 2))])
 
     def set_gyro1(self, k):
         self._driver([("imu", "gyro_scale_dps", round(GYRO1_DEFAULT * k, 4))])
