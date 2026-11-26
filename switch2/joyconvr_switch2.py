@@ -178,6 +178,37 @@ class StickCalibration:
         self.live_center = None
         self.pos = [self.START_RANGE, self.START_RANGE]
         self.neg = [self.START_RANGE, self.START_RANGE]
+        self.recent = []
+
+    # Correcao automatica de "drift": analogico solto fica MUITO parado (varia 2-3 numeros),
+    # dedo segurando treme bem mais. Se ele ficar parado perto do meio por ~2 s, esse ponto
+    # passa a ser o meio. Assim um analogico que nao volta 100% para o centro nao fica
+    # andando/virando a camera sozinho.
+    REST_WINDOW = 90          # ~2 s de pacotes
+    REST_MAX_SPREAD = 14      # variacao maxima (numeros brutos) para contar como "solto"
+    REST_MAX_OFFSET = 0.25    # so corrige se estiver perto do meio (nao quando a pessoa segura)
+
+    def _follow_rest(self, raw):
+        if self.live_center is None:
+            return
+        self.recent.append(raw)
+        if len(self.recent) > self.REST_WINDOW:
+            self.recent.pop(0)
+        if len(self.recent) < self.REST_WINDOW:
+            return
+        for i in range(2):
+            vals = [r[i] for r in self.recent]
+            if max(vals) - min(vals) > self.REST_MAX_SPREAD:
+                return
+        for i in range(2):
+            mean = sum(r[i] for r in self.recent) / len(self.recent)
+            off = mean - self.live_center[i]
+            span = self.pos[i] if off >= 0 else self.neg[i]
+            if abs(off) / max(span, 1) > self.REST_MAX_OFFSET:
+                return
+        for i in range(2):
+            mean = sum(r[i] for r in self.recent) / len(self.recent)
+            self.live_center[i] += (mean - self.live_center[i]) * 0.2   # ajusta devagar
 
     def apply(self, raw):
         if not hasattr(self, "rest"):
@@ -195,6 +226,7 @@ class StickCalibration:
             if DEBUG_STICK:
                 log(f"centro do analogico: medido={[round(a) for a in avg]} "
                     f"do controle={list(self.center)} usando={[round(c) for c in self.live_center]}")
+        self._follow_rest(raw)
         out = []
         for i in range(2):
             v = raw[i] - self.live_center[i]

@@ -111,19 +111,43 @@ class JoyCon1:
         self.seq += 1
         if self.seq % 3 == 0:
             bridge.emit("input", hand=self.hand, buttons=buttons, x=sx, y=sy, rx=raw[0], ry=raw[1])
+        step_us = self.sample_step_us(r[1])
         for k in range(3):
             p = 13 + k * 12
             val = [int.from_bytes(bytes(r[p + 2 * i:p + 2 * i + 2]), "little", signed=True) for i in range(6)]
             accel, gyro = val[0:3], val[3:6]
             if g != 1.0:
                 gyro = [max(-32768, min(32767, int(v * g))) for v in gyro]
-            self.ts = (self.ts + IMU_FRAME_US) & 0xFFFFFFFF
+            self.ts = (self.ts + step_us) & 0xFFFFFFFF
             pkt = bytearray(bridge.build_packet(out, True, sent_buttons, sx, sy, accel, gyro, self.ts, self.seq))
             pkt[7] = 1                                  # "este pacote e de um Joy-Con 1"
             try:
                 self.sock.sendto(bytes(pkt), bridge.DRIVER_ADDR)
             except OSError:
                 pass
+
+    def sample_step_us(self, timer):
+        """Tempo entre as amostras do giroscopio, em microssegundos.
+
+        O Joy-Con manda 3 amostras por pacote, mas pelo Bluetooth do PC os pacotes chegam
+        a ~45-55 por segundo (nao 66), entao cada amostra "vale" mais que 5 ms. O byte 1 do
+        pacote e um relogio do proprio Joy-Con (~5 ms por passo): usamos ele, medindo a
+        velocidade exata contra o relogio do PC."""
+        now = time.perf_counter()
+        if not hasattr(self, "t_last"):
+            self.t_last, self.t_ticks, self.t_start, self.sec_per_tick = timer, 0, now, 0.005
+            return IMU_FRAME_US
+        d = (timer - self.t_last) & 0xFF
+        self.t_last = timer
+        self.t_ticks += d
+        elapsed = now - self.t_start
+        if elapsed > 2.0 and self.t_ticks > 0 and elapsed < 30:
+            rate = elapsed / self.t_ticks
+            if 0.003 < rate < 0.008:
+                self.sec_per_tick = rate
+        if d == 0 or d > 40:                 # pacote repetido ou perdemos muitos: usa o normal
+            return IMU_FRAME_US
+        return int(min(max(d * self.sec_per_tick / 3 * 1e6, 1000), 25000))
 
     def run(self):
         try:
