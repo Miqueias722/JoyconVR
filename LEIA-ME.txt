@@ -30,9 +30,22 @@ Instalação
    dispositivo > Bluetooth. No Joy-Con, segure o botãozinho redondo do trilho
    (lateral) até as luzes ficarem correndo. Faça com os dois.
    Joy-Con 2 do Switch 2: NÃO faça isso, veja a seção "JOY-CON 2" abaixo.
-5. Abra o SteamVR. Deve abrir uma janela com a visão do VR.
-   Se a janela não aparecer, no SteamVR clique no menu (≡) > "Exibir visão de VR"
-   ("Display VR View").
+5. Abra o JoyconVR-Joycon2.exe (a janela do programa) e clique em "Abrir SteamVR".
+   A tela do VR ocupa o monitor inteiro; use Alt+Tab para trocar de janela.
+
+A janela do JoyconVR (JoyconVR-Joycon2.exe)
+-------------------------------------------
+Funciona com Joy-Con 1 e Joy-Con 2. Deixe aberta enquanto joga (pode minimizar).
+  * Início ...... cada Joy-Con conectado, o analógico ao vivo e a bateria.
+  * Controles ... cada botão acende quando você aperta; escolha o que ele faz no VR.
+  * Calibrar .... calibra o analógico com desenhos (solte, depois gire em círculos).
+  * Cabeça ...... (opcional) usa a webcam: virar um pouco a cabeça vira bem mais a
+                  visão, e manda olhos e boca para o VRChat. Pede permissão antes.
+                  Tudo fica no seu PC: nada é salvo nem enviado.
+  * Ajustes ..... sensibilidade, zona morta, trocar mãos, tamanho do braço, etc.
+                  Vale na hora, sem reiniciar o SteamVR.
+  * Diagnóstico . copia um texto para mandar se algo der errado.
+Quando sair versão nova, aparece uma faixa verde: clique em "Atualizar agora".
 
 JOY-CON 2 (Nintendo Switch 2)
 -----------------------------
