@@ -85,10 +85,13 @@ def apply_and_restart(zip_path, app_dir, exe_path):
         subprocess.run(["cmd", "/c", "rmdir", "/s", "/q", stage], capture_output=True)
     os.makedirs(stage)
     with zipfile.ZipFile(zip_path) as z:
+        # alguns programas de zip usam "\" nos nomes; trata igual a "/"
         names = z.namelist()
-        root = names[0].split("/")[0] + "/" if names and all(n.startswith(names[0].split("/")[0] + "/") for n in names) else ""
-        for n in names:
-            rel = n[len(root):]
+        norm = [n.replace("\\", "/") for n in names]
+        first = norm[0].split("/")[0] + "/" if norm else ""
+        root = first if norm and all(n.startswith(first) for n in norm) else ""
+        for n, nn in zip(names, norm):
+            rel = nn[len(root):]
             if not rel or rel.endswith("/"):
                 continue
             if rel.replace("\\", "/") in KEEP and os.path.exists(os.path.join(app_dir, rel)):
