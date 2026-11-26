@@ -17,6 +17,8 @@ import webbrowser
 import joyconvr_calibrate as calibrate
 import joyconvr_pages as pages
 import joyconvr_feedback as feedback
+import joyconvr_head as headtrack
+import joyconvr_headtab as headtab
 import joyconvr_switch1 as switch1
 import joyconvr_update as updater
 import joyconvr_switch2 as bridge
@@ -203,7 +205,7 @@ class App:
         tabs = tk.Frame(pad, bg=BG)
         tabs.pack(fill="x", pady=(8, 0))
         self.tab_buttons = {}
-        for key, label in (("home", "Início"), ("controls", "Controles"), ("calibrate", "Calibrar"), ("settings", "Ajustes")):
+        for key, label in (("home", "Início"), ("controls", "Controles"), ("calibrate", "Calibrar"), ("head", "Cabeça"), ("settings", "Ajustes")):
             b = tk.Label(tabs, text=label, bg=BG, fg=MUTED, font=(FONT, 10, "bold"), padx=14, pady=6, cursor="hand2")
             b.pack(side="left")
             b.bind("<Button-1>", lambda e, k=key: self.show_page(k))
@@ -217,6 +219,11 @@ class App:
         self.page_calibrate = calibrate.CalibratePage(self.content, app_dir(), lambda: pages.save_settings(app_dir()))
         self.pages = {"home": self.page_home, "controls": self.page_controls, "calibrate": self.page_calibrate,
                       "settings": self.page_settings}
+        self.page_head = headtab.HeadPage(self.content, lambda: pages.save_settings(app_dir()))
+        self.pages["head"] = self.page_head
+        if headtrack.settings().get("consent") and headtrack.settings().get("enabled"):
+            headtrack.TRACKER.start()
+        self.root.after(70, self.draw_head)
 
         # steps
         steps = tk.Canvas(self.page_home, width=626, height=62, bg=BG, highlightthickness=0)
@@ -469,6 +476,11 @@ class App:
                 self.events.put(("update_error", {"text": str(e)}))
         threading.Thread(target=work, daemon=True).start()
 
+    def draw_head(self):
+        if self.pages.get("head") is not None and self.page_head.winfo_ismapped():
+            self.page_head.draw()
+        self.root.after(66, self.draw_head)
+
     def show_page(self, key):
         for k, page in self.pages.items():
             page.pack_forget()
@@ -529,5 +541,29 @@ class App:
         self.root.mainloop()
 
 
+def self_test_face(image_path, out_path):
+    """Teste interno: analisa uma FOTO (nao a webcam) e escreve o resultado num arquivo."""
+    try:
+        import cv2
+        import numpy as np
+        import mediapipe as mp
+        from mediapipe.tasks import python as mpp
+        from mediapipe.tasks.python import vision
+        opts = vision.FaceLandmarkerOptions(base_options=mpp.BaseOptions(model_asset_path=headtrack.model_path()),
+                                            running_mode=vision.RunningMode.IMAGE, num_faces=1,
+                                            output_facial_transformation_matrixes=True)
+        lm = vision.FaceLandmarker.create_from_options(opts)
+        rgb = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
+        res = lm.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(rgb)))
+        text = f"OK pontos={len(res.face_landmarks[0]) if res.face_landmarks else 0}"
+    except Exception as e:  # noqa: BLE001
+        text = f"ERRO {e!r}"
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+
 if __name__ == "__main__":
+    if len(sys.argv) >= 4 and sys.argv[1] == "--teste-rosto":
+        self_test_face(sys.argv[2], sys.argv[3])
+        os._exit(0)
     App().run()

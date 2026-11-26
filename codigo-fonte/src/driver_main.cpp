@@ -795,6 +795,21 @@ private:
         {
             const int n = recv(udp_, reinterpret_cast<char*>(buf), sizeof(buf), 0);
             if (n <= 0) break;
+            // Head tracking from the app's webcam tab: "JVRK" 1, yaw, pitch (radians, already
+            // multiplied by the app so small head turns give big view turns).
+            if (n >= 13 && std::memcmp(buf, "JVRK", 4) == 0 && buf[4] == 1)
+            {
+                float y = 0, pch = 0;
+                std::memcpy(&y, buf + 5, 4);
+                std::memcpy(&pch, buf + 9, 4);
+                if (std::isfinite(y) && std::isfinite(pch))
+                {
+                    headTrackYaw_ = std::clamp<double>(y, -M_PI, M_PI);
+                    headTrackPitch_ = std::clamp<double>(pch, -1.4, 1.4);
+                    lastHeadTrack_ = std::chrono::steady_clock::now();
+                }
+                continue;
+            }
             Switch2Packet p;
             if (!switch2::Parse(buf, static_cast<size_t>(n), p)) continue;
             const int i = p.hand == JoyconHand::Left ? 0 : 1;
@@ -841,8 +856,16 @@ private:
 
     void UpdateHmdPose()
     {
-        const Quat yaw = Quat::AxisAngle({0, 1, 0}, headYaw_);
-        const Quat pitch = Quat::AxisAngle({1, 0, 0}, headPitch_);
+        // webcam head tracking only turns the view (hands stay with the body), and fades out if
+        // the app stops sending (camera turned off / app closed)
+        if (std::chrono::steady_clock::now() - lastHeadTrack_ > std::chrono::milliseconds(700))
+        {
+            headTrackYaw_ *= 0.9;
+            headTrackPitch_ *= 0.9;
+        }
+        const double maxPitch = rt_.config.look.maxPitchDeg * M_PI / 180.0;
+        const Quat yaw = Quat::AxisAngle({0, 1, 0}, headYaw_ + headTrackYaw_);
+        const Quat pitch = Quat::AxisAngle({1, 0, 0}, std::clamp(headPitch_ + headTrackPitch_, -maxPitch, maxPitch));
         vr::DriverPose_t pose = BasePose();
         pose.qRotation = ToVr(yaw * pitch);
         pose.vecPosition[0] = 0.0;
@@ -857,6 +880,8 @@ private:
         for (auto& t : trackers_) t.Recenter();
         headYaw_ = 0.0;
         headPitch_ = 0.0;
+        ++recenterCount_;    // the app re-zeroes the webcam head position too
+        SendAppState();
         DriverLog("recentered");
     }
 
@@ -890,7 +915,7 @@ private:
 
     void SendAppState()
     {
-        const uint8_t msg[6] = {'J', 'V', 'R', 'S', 1, static_cast<uint8_t>(extendMode_ ? 1 : 0)};
+        const uint8_t msg[7] = {'J', 'V', 'R', 'S', 1, static_cast<uint8_t>(extendMode_ ? 1 : 0), recenterCount_};
         SendToApp(msg, sizeof(msg));
         lastStateSend_ = std::chrono::steady_clock::now();
     }
@@ -1242,6 +1267,9 @@ private:
     double headPitch_ = 0.0;
     bool lookMode_ = false;
     bool extendMode_ = false;   // arms stretched forward (Capture held)
+    uint8_t recenterCount_ = 0;
+    double headTrackYaw_ = 0.0, headTrackPitch_ = 0.0;
+    std::chrono::steady_clock::time_point lastHeadTrack_{};
     std::chrono::steady_clock::time_point lastStateSend_{};
     std::chrono::steady_clock::time_point rumbleUntil_[2]{}, lastRumbleSend_[2]{};
     float rumbleAmp_[2] = {0.0f, 0.0f};

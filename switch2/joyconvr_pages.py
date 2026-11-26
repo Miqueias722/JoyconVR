@@ -151,7 +151,7 @@ def load_settings(app_dir):
     try:
         with open(settings_path(app_dir), encoding="utf-8") as f:
             saved = json.load(f)
-        for k in ("swap_hands", "gyro_sensitivity", "auto_steamvr", "cal2"):
+        for k in ("swap_hands", "gyro_sensitivity", "auto_steamvr", "cal2", "head"):
             if k in saved:
                 bridge.SETTINGS[k] = saved[k]
         for i in range(2):

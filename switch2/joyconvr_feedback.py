@@ -13,6 +13,7 @@ import struct
 import joyconvr_switch2 as bridge
 
 PORT = 27761
+_last_recenter = None
 
 
 def _joycon2_for(vr_hand):
@@ -44,6 +45,12 @@ def listen(stop_event):
         except OSError:
             continue
         if len(data) >= 6 and data[:4] == b"JVRS" and data[4] == 1:
+            if len(data) >= 7:
+                global _last_recenter
+                if _last_recenter is not None and data[6] != _last_recenter:
+                    import joyconvr_head
+                    joyconvr_head.TRACKER.recenter()      # toque no Captura zera a cabeca tambem
+                _last_recenter = data[6]
             extend = bool(data[5] & 1)
             if extend != bridge.EXTEND:
                 bridge.EXTEND = extend
