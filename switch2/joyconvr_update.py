@@ -19,7 +19,7 @@ import tempfile
 import urllib.request
 import zipfile
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 REPO = "Miqueias722/JoyconVR"   # dono/repositorio no GitHub
 ASSET_NAME = "JoyconVR.zip"
 KEEP = {"joyconvr/config/config.json", "joyconvr/config/joyconcal.json", "joycon2_config.json"}
@@ -105,9 +105,19 @@ title Atualizando o JoyconVR...
 echo Atualizando o JoyconVR, so um instante...
 :wait
 tasklist /FI "PID eq {pid}" | find "{pid}" >nul && (timeout /t 1 >nul & goto wait)
-timeout /t 1 >nul
+timeout /t 2 >nul
 robocopy "{stage}" "{app_dir}" /E /NFL /NDL /NJH /NJS /R:5 /W:1 >nul
 start "" "{exe_path}"
 del "%~f0"
 """)
-    subprocess.Popen(["cmd", "/c", bat], creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
+    # O .exe (PyInstaller) deixa variaveis internas no ambiente. Se o .exe novo herdar elas,
+    # ele procura a DLL do Python na pasta temporaria do .exe velho (que ja foi apagada) e da
+    # "Failed to load Python DLL". Entao o .bat roda com um ambiente limpo.
+    env = {k: v for k, v in os.environ.items()
+           if not k.upper().startswith(("_PYI", "_MEIPASS"))}
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass and "PATH" in env:
+        env["PATH"] = os.pathsep.join(p for p in env["PATH"].split(os.pathsep)
+                                      if not p.lower().startswith(meipass.lower()))
+    subprocess.Popen(["cmd", "/c", bat], env=env, creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
