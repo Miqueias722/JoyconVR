@@ -19,7 +19,7 @@ import tempfile
 import urllib.request
 import zipfile
 
-VERSION = "1.3.2"
+VERSION = "1.3.3"
 REPO = "Miqueias722/JoyconVR"   # dono/repositorio no GitHub
 ASSET_NAME = "JoyconVR.zip"
 KEEP = {"joyconvr/config/config.json", "joyconvr/config/joyconcal.json", "joycon2_config.json"}

@@ -80,6 +80,14 @@ void MotionTracker::AddSample(const ImuSample& s, double dt)
 
     Vec3 omega = (rawGyro - bias_) * (imu_.gyroScaleDps * kDegToRad); // rad/s, sensor frame
 
+    // --- Anti-drift: while the controller is held still, the tiny leftover of the bias would
+    // slowly turn the hand (the Joy-Con has no compass to notice it). Ignore rates under
+    // ~1 deg/s once it has been still for a moment; real movements are far faster.
+    if (stillCount_ > 20 && omega.Length() < 1.0 * kDegToRad)
+    {
+        omega = Vec3{0, 0, 0};
+    }
+
     // --- Gravity correction (Mahony proportional term). Trust the accelerometer less when moving.
     if (accelNorm > 0.5 && accelNorm < 1.5)
     {

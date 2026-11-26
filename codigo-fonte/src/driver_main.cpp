@@ -382,12 +382,14 @@ public:
         p->SetStringProperty(container_, vr::Prop_ModelNumber_String, left ? "Knuckles Left" : "Knuckles Right");
         p->SetStringProperty(container_, vr::Prop_RenderModelName_String,
                              left ? "{indexcontroller}valve_controller_knu_1_0_left" : "{indexcontroller}valve_controller_knu_1_0_right");
-        p->SetStringProperty(container_, vr::Prop_InputProfilePath_String,
-                             left ? "{joyconvr}/input/joycon_left_profile.json" : "{joyconvr}/input/joycon_right_profile.json");
+        // Present as a real Valve Index controller: the SteamVR menu and every game already have
+        // button layouts for it. (A custom "joycon" type got only a generic layout in the
+        // SteamVR menu, where the trigger did not click.)
+        p->SetStringProperty(container_, vr::Prop_InputProfilePath_String, "{indexcontroller}/input/index_controller_profile.json");
         p->SetStringProperty(container_, vr::Prop_SerialNumber_String, left ? "JoyconVR-L" : "JoyconVR-R");
         p->SetStringProperty(container_, vr::Prop_TrackingSystemName_String, kTrackingSystemName);
         p->SetStringProperty(container_, vr::Prop_ManufacturerName_String, "Valve");
-        p->SetStringProperty(container_, vr::Prop_ControllerType_String, left ? "joycon_left" : "joycon_right");
+        p->SetStringProperty(container_, vr::Prop_ControllerType_String, "knuckles");
         p->SetUint64Property(container_, vr::Prop_CurrentUniverseId_Uint64, 46);
         p->SetInt32Property(container_, vr::Prop_ControllerRoleHint_Int32,
                             left ? vr::TrackedControllerRole_LeftHand : vr::TrackedControllerRole_RightHand);
@@ -495,6 +497,14 @@ private:
         gripForce_ = scalar("/input/grip/force", vr::VRScalarUnits_NormalizedOneSided);
         thumbX_ = scalar("/input/thumbstick/x", vr::VRScalarUnits_NormalizedTwoSided);
         thumbY_ = scalar("/input/thumbstick/y", vr::VRScalarUnits_NormalizedTwoSided);
+
+        // Parts of the Index controller the Joy-Con does not have: created so the Index
+        // layouts find everything they expect; they simply stay at rest.
+        boolean("/input/system/touch");
+        boolean("/input/trackpad/touch");
+        scalar("/input/trackpad/x", vr::VRScalarUnits_NormalizedTwoSided);
+        scalar("/input/trackpad/y", vr::VRScalarUnits_NormalizedTwoSided);
+        scalar("/input/trackpad/force", vr::VRScalarUnits_NormalizedOneSided);
 
         vr::VRInputComponentHandle_t haptic = 0;
         in->CreateHapticComponent(container_, "/output/haptic", &haptic);
@@ -639,6 +649,22 @@ private:
         trackers_[i].Configure(hand, hc, rt_.config.arm, imu);
     }
 
+    // Bluetooth hiccups make the same Joy-Con switch between "read by the app" and "read by
+    // the driver". The motion sensor is the same, so keep where the hand is pointing; only a
+    // different kind of Joy-Con (1 <-> 2) needs a fresh start.
+    void SwitchSource(int i, bool switch2Imu)
+    {
+        if (trackerIsSwitch2_[i] == switch2Imu && trackers_[i].HasData())
+        {
+            ConfigureTracker(i, switch2Imu);
+        }
+        else
+        {
+            ResetTracker(i, switch2Imu);
+        }
+        trackerIsSwitch2_[i] = switch2Imu;
+    }
+
     void ResetTracker(int i, bool switch2Source)
     {
         trackers_[i] = MotionTracker();
@@ -759,7 +785,7 @@ private:
                 h.source = HandRuntime::Source::Switch2;
                 h.udpJoycon1 = p.joycon1;
                 h.haveTimestamp = false;
-                ResetTracker(i, !p.joycon1);
+                SwitchSource(i, !p.joycon1);
                 DriverLog("%s %s connected (app)", i == 0 ? "left" : "right", p.joycon1 ? "Joy-Con 1" : "Joy-Con 2");
             }
 
@@ -943,21 +969,25 @@ private:
                         if (hids_[i].Connect())
                         {
                             DriverLog("%s Joy-Con connected", i == 0 ? "left" : "right");
-                            ResetTracker(i, false);
-                            handRt_[i].source = HandRuntime::Source::Hid;
+                            // If the app is already sending this hand, leave it in charge.
+                            if (handRt_[i].source != HandRuntime::Source::Switch2)
+                            {
+                                SwitchSource(i, false);
+                                handRt_[i].source = HandRuntime::Source::Hid;
+                            }
                             UpdateLights();
                         }
                     }
                 }
 
                 const bool appActive = handRt_[i].source == HandRuntime::Source::Switch2 &&
-                                       now - handRt_[i].lastUdp < std::chrono::seconds(1);
+                                       now - handRt_[i].lastUdp < kAppTimeout;
                 if (hids_[i].IsConnected() && !appActive)
                 {
                     if (handRt_[i].source != HandRuntime::Source::Hid)
                     {
                         handRt_[i].source = HandRuntime::Source::Hid;
-                        ResetTracker(i, false);
+                        SwitchSource(i, false);
                     }
                     imu.clear();
                     raw[i].hasNormStick = false;
@@ -984,7 +1014,7 @@ private:
             {
                 HandRuntime& h = handRt_[i];
                 if (h.source == HandRuntime::Source::Switch2 &&
-                    (!h.udpConnected || now - h.lastUdp > std::chrono::seconds(1)))
+                    (!h.udpConnected || now - h.lastUdp > kAppTimeout))
                 {
                     DriverLog("%s Joy-Con disconnected from the app", i == 0 ? "left" : "right");
                     h.source = HandRuntime::Source::None;
@@ -1067,6 +1097,8 @@ private:
     std::unique_ptr<VirtualHmd> hmd_;
     std::unique_ptr<JoyconController> controllers_[2];
     std::thread thread_;
+    bool trackerIsSwitch2_[2] = {false, false};
+    static constexpr std::chrono::milliseconds kAppTimeout{3000};
     std::chrono::steady_clock::time_point lastConfigCheck_{};
     std::filesystem::file_time_type configStamp_{};
     bool haveConfigStamp_ = false;
