@@ -52,8 +52,8 @@ Não precisa instalar Python nem nada: é só o JoyconVR-Joycon2.exe.
 5. Mexa os analógicos: a bolinha na janela mostra se estão funcionando.
 6. Deixe essa janela aberta (pode minimizar) e clique em "Abrir SteamVR".
 
-Com o Joy-Con 2, o botão Captura do esquerdo funciona igual (modo olhar e
-recentralizar). As luzes do Joy-Con 2 não mudam no modo olhar.
+Com o Joy-Con 2, o botão Captura do esquerdo funciona igual (recentralizar e
+esticar o braço). As luzes do Joy-Con 2 não mudam ao esticar o braço.
 
 Se no Joy-Con 2 a mão apontar para o lado errado, abra CONFIGURAR.bat e, na
 parte "switch2", troque "forward_axis" (teste "+x", "-x", "+y" e "-y").
@@ -79,12 +79,14 @@ Controles
   + (direito) / - (esquerdo) ..... botão System (abre o menu do SteamVR)
   Home (direito) ................. botão Menu do jogo
 
+  Analógico direito ............. sempre gira a câmera (olhar em volta)
+
   Captura (quadradinho, esquerdo):
-    - apertar rápido = liga/desliga o MODO OLHAR. Nesse modo, as 4 luzes do
-      Joy-Con acendem e o analógico esquerdo vira a câmera. Aperte de novo para
-      voltar.
-    - SEGURAR 1 segundo = RECENTRALIZAR. Faça isso com os dois Joy-Cons
-      apontando para a tela.
+    - TOQUE rápido = RECENTRALIZAR. Faça isso com os dois Joy-Cons apontando
+      para a tela.
+    - SEGURAR 1 segundo = liga/desliga o BRAÇO ESTICADO (as mãos vão para a
+      frente, para alcançar coisas). No Joy-Con 1 as 4 luzes acendem.
+      Quanto estica: janela > aba Ajustes > "Quanto o braço estica".
 
   Mouse: segure o botão do meio (a rodinha) e mexa o mouse para olhar em volta.
 
@@ -93,8 +95,8 @@ Controles
 
 Primeiro teste
 --------------
-Com o SteamVR aberto, aponte os Joy-Cons para a tela e segure Captura por
-1 segundo. Agora gire o pulso: as mãos devem acompanhar.
+Com o SteamVR aberto, aponte os Joy-Cons para a tela e dê um toque no
+Captura. Agora gire o pulso: as mãos devem acompanhar.
 
 Se algo estiver errado:
   * A mão aponta para TRÁS: abra CONFIGURAR.bat e troque "forward_axis": "+x"

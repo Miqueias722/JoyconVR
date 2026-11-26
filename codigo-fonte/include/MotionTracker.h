@@ -22,6 +22,8 @@ public:
 
     // Orientation in SteamVR "body" space (yaw relative to the body, -Z forward, +Y up).
     Quat ControllerOrientation() const;
+    // Angular velocity of the controller in the same space as ControllerOrientation (rad/s).
+    Vec3 AngularVelocity() const;
 
     // Position relative to the eyes in body space (metres).
     Vec3 HandOffsetFromHead(double extend) const;
@@ -39,6 +41,7 @@ private:
     ImuConfig imu_;
 
     Quat q_;                    // sensor -> filter world (Z up)
+    Vec3 omega_;                // last gyro rate, sensor frame (rad/s), for pose prediction
     bool initialized_ = false;
     Vec3 bias_;                 // raw gyro bias (LSB)
     Vec3 gyroMean_;             // running mean of raw gyro (LSB)

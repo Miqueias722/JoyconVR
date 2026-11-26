@@ -122,7 +122,7 @@ try {
         Write-Host "1) Joy-Con do Switch 1: conecte pelo Bluetooth do Windows"
         Write-Host "   Joy-Con 2 do Switch 2: abra JoyconVR-Joycon2.exe (veja o LEIA-ME)"
         Write-Host "2) Abra o SteamVR"
-        Write-Host "3) Segure os Joy-Cons apontando para a tela e segure o botao Captura (quadradinho) por 1 segundo"
+        Write-Host "3) Aponte os Joy-Cons para a tela e de um toque no botao Captura (quadradinho)"
         Write-Host ""
         Write-Host "IMPORTANTE: nao mova nem apague esta pasta: $root" -ForegroundColor Yellow
     }

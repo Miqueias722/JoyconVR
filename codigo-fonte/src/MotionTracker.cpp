@@ -87,6 +87,8 @@ void MotionTracker::AddSample(const ImuSample& s, double dt)
     {
         omega = Vec3{0, 0, 0};
     }
+    // smoothed copy for prediction (raw gyro is a bit noisy)
+    omega_ = omega_ + (omega - omega_) * 0.5;
 
     // --- Gravity correction (Mahony proportional term). Trust the accelerometer less when moving.
     if (accelNorm > 0.5 && accelNorm < 1.5)
@@ -153,6 +155,12 @@ void MotionTracker::Recenter()
     const Vec3 pointing = vr.Rotate({0, 0, -1});
     yawOffset_ = Quat::AxisAngle({0, 1, 0}, -YawOf(pointing));
     centered_ = true;
+}
+
+Vec3 MotionTracker::AngularVelocity() const
+{
+    const Vec3 w = (yawOffset_ * kVrFromWorld * q_).Rotate(omega_);
+    return (std::isfinite(w.x) && std::isfinite(w.y) && std::isfinite(w.z)) ? w : Vec3{0, 0, 0};
 }
 
 Quat MotionTracker::ControllerOrientation() const

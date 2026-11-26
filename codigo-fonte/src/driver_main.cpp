@@ -841,7 +841,7 @@ private:
             if (hids_[i].IsConnected())
             {
                 const uint8_t base = i == 0 ? 0x01 : 0x02;
-                hids_[i].SetPlayerLights(lookMode_ ? 0x0F : base);
+                hids_[i].SetPlayerLights(extendMode_ ? 0x0F : base);
             }
         }
     }
@@ -861,7 +861,9 @@ private:
         HandRuntime& t = handRt_[ti];
         HandRuntime& r = handRt_[ri];
 
-        // Recenter on long hold.
+        // Capture button: a quick tap recenters; holding it (~1 s) turns "arm stretched
+        // forward" on/off. (The Joy-Con cannot sense moving the hand forward, so this is how
+        // to reach things in front of you.)
         if (recenterPressed && !r.lastRecenter)
         {
             r.pressStart = now;
@@ -871,22 +873,19 @@ private:
             std::chrono::duration<double>(now - r.pressStart).count() >= rec.holdSeconds)
         {
             r.recenterFired = true;
+            extendMode_ = !extendMode_;
+            UpdateLights();
+            DriverLog("arm stretch %s", extendMode_ ? "on" : "off");
+        }
+        if (!recenterPressed && r.lastRecenter && !r.recenterFired)
+        {
             RecenterAll();
         }
 
-        // Toggle look mode: on press, or (if shared with recenter) on a short release.
-        if (shared)
-        {
-            if (!togglePressed && t.lastToggle && !r.recenterFired)
-            {
-                lookMode_ = !lookMode_;
-                UpdateLights();
-            }
-        }
-        else if (togglePressed && !t.lastToggle)
+        // A separate look toggle button (only if someone set one different from Capture).
+        if (!shared && togglePressed && !t.lastToggle)
         {
             lookMode_ = !lookMode_;
-            UpdateLights();
         }
 
         t.lastToggle = togglePressed;
@@ -934,7 +933,8 @@ private:
         for (int i = 0; i < 2; ++i)
         {
             const HandConfig& cfg = i == 0 ? rt_.config.left : rt_.config.right;
-            const double target = (!cfg.extendButton.empty() && ReadButton(raw[i], cfg.extendButton)) ? cfg.extendDistance : 0.0;
+            const bool held = !cfg.extendButton.empty() && ReadButton(raw[i], cfg.extendButton);
+            const double target = (extendMode_ || held) ? cfg.extendDistance : 0.0;
             handRt_[i].extend += (target - handRt_[i].extend) * std::min(1.0, dt * 12.0);
         }
     }
@@ -1048,6 +1048,17 @@ private:
                     pose.result = pose.poseIsValid ? vr::TrackingResult_Running_OK : vr::TrackingResult_Running_OutOfRange;
                     const Vec3 pos = head + bodyYaw.Rotate(trackers_[i].HandOffsetFromHead(handRt_[i].extend));
                     pose.qRotation = ToVr(bodyYaw * trackers_[i].ControllerOrientation());
+                    // Prediction: tell SteamVR how fast the hand is turning and that the data is a
+                    // little old, so it draws the hand where it will be (hides Bluetooth delay).
+                    const double predict = std::clamp<double>(rt_.config.imu.predictionMs, 0.0, 60.0) / 1000.0;
+                    if (predict > 0.0)
+                    {
+                        const Vec3 w = bodyYaw.Rotate(trackers_[i].AngularVelocity());
+                        pose.vecAngularVelocity[0] = w.x;
+                        pose.vecAngularVelocity[1] = w.y;
+                        pose.vecAngularVelocity[2] = w.z;
+                        pose.poseTimeOffset = -predict;
+                    }
                     pose.vecPosition[0] = pos.x;
                     pose.vecPosition[1] = pos.y;
                     pose.vecPosition[2] = pos.z;
@@ -1108,6 +1119,7 @@ private:
     double headYaw_ = 0.0;
     double headPitch_ = 0.0;
     bool lookMode_ = false;
+    bool extendMode_ = false;   // arms stretched forward (Capture held)
 #ifdef _WIN32
     bool mouseHeld_ = false;
     POINT lastMouse_{};

@@ -182,6 +182,7 @@ DriverConfig JoyconConfig::LoadFromFile(const std::string& configPath, std::stri
         m.gyroScaleDps = it->value("gyro_scale_dps", m.gyroScaleDps);
         m.accelScaleG = it->value("accel_scale_g", m.accelScaleG);
         m.tiltCorrection = it->value("tilt_correction", m.tiltCorrection);
+        m.predictionMs = it->value("prediction_ms", m.predictionMs);
     }
 
     if (auto it = j.find("switch2"); it != j.end() && it->is_object())

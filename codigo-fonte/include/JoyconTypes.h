@@ -148,6 +148,7 @@ struct ImuConfig
     float gyroScaleDps = 0.070f;        // degrees/second per LSB (±2000 dps range)
     float accelScaleG = 0.000244f;      // g per LSB (±8 g range)
     float tiltCorrection = 1.0f;        // how fast gravity pulls pitch/roll back (0 = pure gyro)
+    float predictionMs = 20.0f;         // show the hand this far ahead to hide Bluetooth delay (0 = off)
 };
 
 struct Switch2HandConfig

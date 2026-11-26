@@ -28,7 +28,7 @@ JOYCON_BUTTONS = [
      ("Clique analógico", "stick", 0x400), ("A", "a", 0x8), ("B", "b", 0x4), ("X", "x", 0x2),
      ("Y", "y", 0x1), ("SL", "sl", 0x20), ("SR", "sr", 0x10)],
 ]
-FIXED = [("Captura", 0x2000, "modo olhar / centralizar"), ("C", 0x4000, "(livre)")]
+FIXED = [("Captura", 0x2000, "toque: centro · segurar: esticar"), ("C", 0x4000, "(livre)")]
 
 # Acoes de VR (controle do Index, que os jogos entendem)
 VR_ACTIONS = [
@@ -105,6 +105,18 @@ def read_number(app_dir, section, key, default):
         return float(m.group(1)) if m else default
     except Exception:  # noqa: BLE001
         return default
+
+
+def write_number_all(app_dir, key, value):
+    """Troca o numero de TODAS as linhas "key": numero (ex.: as duas maos)."""
+    path = driver_config_path(app_dir)
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    text, n = re.subn(r'("' + re.escape(key) + r'"\s*:\s*)(-?[0-9.]+)', lambda m: m.group(1) + f"{value:g}", text)
+    if n == 0:
+        raise RuntimeError(f"config.json sem {key}")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
 
 
 def write_number(app_dir, section, key, value):
@@ -337,8 +349,14 @@ class SettingsPage(tk.Frame):
         tk.Label(d, text="Levantar o braço", bg=CARD, fg=MUTED, font=(FONT, 9)).grid(
             row=2, column=2, sticky="w", padx=(12, 0))
         self._scale(d, 0.1, 1.0, 0.05, elbow, self.set_elbow, 160).grid(row=2, column=3, sticky="w")
+        reach = read_number(app_dir, "hands", "extend_distance", 0.35)
+        tk.Label(d, text="Quanto o braço estica", bg=CARD, fg=MUTED, font=(FONT, 9)).grid(
+            row=3, column=0, sticky="w")
+        self._scale(d, 0.1, 0.8, 0.05, reach, self.set_reach, 160).grid(row=3, column=1, sticky="w")
+        tk.Label(d, text="(segure o Captura para esticar)", bg=CARD, fg=FAINT, font=(FONT, 8)).grid(
+            row=3, column=2, columnspan=2, sticky="w", padx=(12, 0))
         self.driver_status = tk.Label(d, text="", bg=CARD, fg=MUTED, font=(FONT, 8))
-        self.driver_status.grid(row=3, column=0, columnspan=4, sticky="w")
+        self.driver_status.grid(row=4, column=0, columnspan=4, sticky="w")
 
         bar = tk.Frame(self, bg=BG)
         bar.pack(fill="x", pady=(10, 0))
@@ -376,6 +394,19 @@ class SettingsPage(tk.Frame):
 
     def set_camera(self, k):
         self._driver([("look", "yaw_speed_deg", round(140 * k)), ("look", "pitch_speed_deg", round(90 * k))])
+
+    def set_reach(self, meters):
+        # o esticar vale para as duas maos: troca todos os "extend_distance" do arquivo
+        if getattr(self, "_pending_reach", None):
+            self.after_cancel(self._pending_reach)
+
+        def go():
+            try:
+                write_number_all(self.app_dir, "extend_distance", round(meters, 2))
+                self.driver_status.configure(text="salvo ✓", fg=OK)
+            except Exception as e:  # noqa: BLE001
+                self.driver_status.configure(text=f"erro: {e}", fg="#ff5b6b")
+        self._pending_reach = self.after(400, go)
 
     def set_elbow(self, k):
         # quanto o cotovelo acompanha o Joy-Con: maior = a mao sobe mais quando voce aponta pra cima

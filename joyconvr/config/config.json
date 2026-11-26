@@ -17,12 +17,12 @@
 
   // Olhar em volta
   "look": {
-    // Aperte Captura (botão quadrado do Joy-Con esquerdo) para ligar/desligar o "modo olhar".
+    // Captura (botão quadrado do Joy-Con esquerdo): toque = recentralizar, segurar = esticar o braço.
     // No modo olhar, o analógico DIREITO vira a câmera (e o esquerdo continua andando).
     // Para usar o esquerdo para olhar, troque "right" por "left".
     "toggle": { "hand": "left", "button": "capture" },
     "stick_hand": "right",
-    // true = o analógico direito SEMPRE mexe a câmera; toque no Captura para desligar/ligar isso.
+    // true = o analógico direito SEMPRE mexe a câmera.
     "always_on": true,
     "yaw_speed_deg": 140,
     "pitch_speed_deg": 90,
@@ -48,7 +48,9 @@
   "imu": {
     "gyro_scale_dps": 0.070,
     "accel_scale_g": 0.000244,
-    "tilt_correction": 1.0
+    "tilt_correction": 1.0,
+    // adianta a mao (em milissegundos) para esconder o atraso do Bluetooth. 0 = desligado
+    "prediction_ms": 20
   },
 
   // Joy-Con 2 (Switch 2): eles conectam pelo programa JoyconVR-Joycon2.exe
@@ -76,7 +78,7 @@
       "flip_up": false,
       // Segure este botão para "esticar" o braço para frente (ex.: "sl"). Vazio = desligado.
       "extend_button": "",
-      "extend_distance": 0.25,
+      "extend_distance": 0.35,
       "button_bindings": {
         "minus": "system",
         "zl": "trigger_click",
@@ -93,7 +95,7 @@
       "forward_axis": "+x",
       "flip_up": false,
       "extend_button": "",
-      "extend_distance": 0.25,
+      "extend_distance": 0.35,
       "button_bindings": {
         "plus": "system",
         "home": "menu",
