@@ -34,7 +34,27 @@ DEFAULTS = {
     "pitch_on": True,       # tambem olhar para cima/baixo
     "invert_yaw": False,
     "invert_pitch": False,
+    "head_view": True,      # virar a visao do jogo com a cabeca
+    "vrchat": False,        # mandar olhos e boca para o VRChat (OSC)
 }
+
+VRCHAT_ADDR = ("127.0.0.1", 9000)     # porta padrao do OSC do VRChat (no proprio PC)
+# prefixos usados pelos avatares com face tracking (VRCFaceTracking); mandamos nos dois
+FT_PREFIXES = ("/avatar/parameters/v2/", "/avatar/parameters/FT/v2/")
+
+
+def osc(address, *values):
+    """Monta uma mensagem OSC simples (so numeros float)."""
+    def pad(b):
+        return b + bytes(4 - len(b) % 4)
+    msg = pad(address.encode("ascii")) + pad(("," + "f" * len(values)).encode("ascii"))
+    for v in values:
+        msg += struct.pack(">f", float(v))
+    return msg
+
+
+def clamp01(v):
+    return 0.0 if v < 0 else (1.0 if v > 1 else v)
 
 
 def settings():
@@ -65,6 +85,8 @@ class HeadTracker:
         self.out = [0.0, 0.0]
         self.recenter_flag = False
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.expr = {"olhos": 0.0, "boca": 0.0, "sorriso": 0.0}   # para os indicadores da aba
+        self.blink_base = 0.3
 
     # --- controle
     def running(self):
@@ -87,6 +109,10 @@ class HeadTracker:
     def snapshot(self):
         with self.lock:
             return list(self.points), self.head, self.view, self.fps, self.status
+
+    def expressions(self):
+        with self.lock:
+            return dict(self.expr)
 
     # --- trabalho
     def _set(self, **kw):
@@ -116,7 +142,7 @@ class HeadTracker:
             opts = vision.FaceLandmarkerOptions(
                 base_options=mpp.BaseOptions(model_asset_path=model_path()),
                 running_mode=vision.RunningMode.VIDEO, num_faces=1,
-                output_facial_transformation_matrixes=True)
+                output_facial_transformation_matrixes=True, output_face_blendshapes=True)
             lm = vision.FaceLandmarker.create_from_options(opts)
         except Exception as e:  # noqa: BLE001
             cap.release()
@@ -154,6 +180,8 @@ class HeadTracker:
                     pitch = math.degrees(math.asin(max(-1.0, min(1.0, R[1, 2]))))  # + = olhou para cima
                     pts = [(p.x, p.y) for p in res.face_landmarks[0]]
                     self._update_view(yaw, pitch)
+                    if res.face_blendshapes:
+                        self._face(res.face_blendshapes[0])
                     self._set(points=pts, status="rastreando ✓")
                 else:
                     if lost_since is None:
@@ -192,11 +220,74 @@ class HeadTracker:
         a = 1.0 - max(0.0, min(0.95, float(cfg.get("smooth", 0.5))))
         self.out = [self.out[i] + (target[i] - self.out[i]) * a for i in range(2)]
         self._set(head=(rel[0], rel[1]), view=(self.out[0], self.out[1]))
+        if not cfg.get("head_view", True):
+            return
         pkt = b"JVRK\x01" + struct.pack("<ff", math.radians(self.out[0]), math.radians(self.out[1]))
         try:
             self.sock.sendto(pkt, bridge.DRIVER_ADDR)
         except OSError:
             pass
+
+    def _face(self, categories):
+        """Expressoes do rosto -> indicadores da aba e (se ligado) VRChat."""
+        b = {c.category_name: float(c.score) for c in categories}
+        g = b.get
+        blink_raw = (g("eyeBlinkLeft", 0) + g("eyeBlinkRight", 0)) / 2
+        # o "olho aberto" de cada pessoa da um valor diferente: aprende o normal dela devagar
+        if blink_raw < self.blink_base:
+            self.blink_base = blink_raw
+        else:
+            self.blink_base += (blink_raw - self.blink_base) * 0.002
+
+        def closed(raw):
+            return clamp01((raw - self.blink_base - 0.08) / 0.4)
+
+        eyes = closed(blink_raw)
+        jaw = clamp01(g("jawOpen", 0) * 1.3)
+        smile = clamp01((g("mouthSmileLeft", 0) + g("mouthSmileRight", 0)) / 2)
+        with self.lock:
+            self.expr = {"olhos": eyes, "boca": jaw, "sorriso": smile}
+        if not settings().get("vrchat"):
+            return
+        # olhos: jeito oficial do VRChat (qualquer avatar). Pitch positivo = para BAIXO.
+        right = (g("eyeLookInLeft", 0) + g("eyeLookOutRight", 0) - g("eyeLookOutLeft", 0) - g("eyeLookInRight", 0)) / 2
+        down = (g("eyeLookDownLeft", 0) + g("eyeLookDownRight", 0) - g("eyeLookUpLeft", 0) - g("eyeLookUpRight", 0)) / 2
+        msgs = [osc("/tracking/eye/EyesClosedAmount", eyes),
+                osc("/tracking/eye/CenterPitchYaw", max(-30.0, min(30.0, down * 30)), max(-35.0, min(35.0, right * 35)))]
+        # boca e rosto: parametros de avatar com face tracking (VRCFaceTracking v2)
+        lid_l = (1 - closed(g("eyeBlinkLeft", 0))) * 0.75 + g("eyeWideLeft", 0) * 0.25
+        lid_r = (1 - closed(g("eyeBlinkRight", 0))) * 0.75 + g("eyeWideRight", 0) * 0.25
+        params = {
+            "JawOpen": jaw,
+            "MouthClosed": g("mouthClose", 0),
+            "MouthOpen": clamp01((g("mouthUpperUpLeft", 0) + g("mouthUpperUpRight", 0) +
+                                  g("mouthLowerDownLeft", 0) + g("mouthLowerDownRight", 0)) / 4),
+            "MouthSmileLeft": g("mouthSmileLeft", 0),
+            "MouthSmileRight": g("mouthSmileRight", 0),
+            "SmileFrownLeft": g("mouthSmileLeft", 0) - g("mouthFrownLeft", 0),
+            "SmileFrownRight": g("mouthSmileRight", 0) - g("mouthFrownRight", 0),
+            "SmileFrown": smile - (g("mouthFrownLeft", 0) + g("mouthFrownRight", 0)) / 2,
+            "LipPucker": g("mouthPucker", 0),
+            "LipFunnel": g("mouthFunnel", 0),
+            "CheekPuffSuck": g("cheekPuff", 0),
+            "EyeLidLeft": lid_l,
+            "EyeLidRight": lid_r,
+            "EyeLid": (lid_l + lid_r) / 2,
+            "EyeSquintLeft": g("eyeSquintLeft", 0),
+            "EyeSquintRight": g("eyeSquintRight", 0),
+            "BrowInnerUp": g("browInnerUp", 0),
+            "BrowOuterUp": (g("browOuterUpLeft", 0) + g("browOuterUpRight", 0)) / 2,
+            "BrowDownLeft": g("browDownLeft", 0),
+            "BrowDownRight": g("browDownRight", 0),
+        }
+        for name, value in params.items():
+            for prefix in FT_PREFIXES:
+                msgs.append(osc(prefix + name, value))
+        for m in msgs:
+            try:
+                self.sock.sendto(m, VRCHAT_ADDR)
+            except OSError:
+                pass
 
 
 TRACKER = HeadTracker()

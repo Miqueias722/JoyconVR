@@ -42,6 +42,15 @@ class HeadPage(tk.Frame):
         self.dots = []
         self.readout = tk.Label(left, text="", bg=BG, fg=MUTED, font=("Consolas", 9))
         self.readout.pack(pady=(6, 0))
+        # indicadores do rosto: mostram o que vai para o VRChat
+        self.expr_canvas = tk.Canvas(left, width=self.W, height=58, bg=BG, highlightthickness=0)
+        self.expr_canvas.pack(pady=(4, 0))
+        self.expr_bars = {}
+        for i, (key, label) in enumerate((("olhos", "piscar"), ("boca", "boca"), ("sorriso", "sorriso"))):
+            y = 8 + i * 18
+            self.expr_canvas.create_text(4, y, anchor="w", text=label, fill=MUTED, font=(FONT, 8))
+            self.expr_canvas.create_rectangle(70, y - 4, 290, y + 4, fill=CARD, outline="")
+            self.expr_bars[key] = self.expr_canvas.create_rectangle(70, y - 4, 70, y + 4, fill=OK, outline="")
 
         right = tk.Frame(self, bg=BG)
         right.pack(side="left", fill="both", expand=True, padx=(18, 0))
@@ -74,12 +83,15 @@ class HeadPage(tk.Frame):
         self._slider(grid, 3, "Suavizar", 0.0, 0.9, 0.05, cfg["smooth"], "smooth", "")
         checks = tk.Frame(right, bg=BG)
         checks.pack(fill="x", pady=(4, 0))
+        self._check(checks, "Virar a visão com a cabeça", "head_view")
+        self._check(checks, "Mandar olhos e boca pro VRChat", "vrchat")
         self._check(checks, "Também olhar pra cima/baixo", "pitch_on")
         self._check(checks, "Inverter esquerda/direita", "invert_yaw")
         self._check(checks, "Inverter cima/baixo", "invert_pitch")
         self._check(checks, "Ligar sozinho quando abrir o JoyconVR", "enabled")
-        tk.Label(right, text="Dica: toque no Captura para a cabeça voltar ao centro.",
-                 bg=BG, fg=FAINT, font=(FONT, 8), anchor="w").pack(fill="x", pady=(6, 0))
+        tk.Label(right, text="Dica: toque no Captura para a cabeça voltar ao centro.\n"
+                             "VRChat: ligue o OSC (menu de ação › Opções › OSC › Ativar).",
+                 bg=BG, fg=FAINT, font=(FONT, 8), anchor="w", justify="left").pack(fill="x", pady=(6, 0))
         self.refresh_button()
         self.draw()
 
@@ -188,5 +200,10 @@ class HeadPage(tk.Frame):
         ay = W - 30 - max(-1, min(1, vp / 60)) * 40
         c.coords(self.arrow, W / 2, W - 30, ax, ay)
         self.readout.configure(text=(f"cabeça {hy:+5.0f}° → visão {vy:+5.0f}°   ({fps:.0f}/s)" if pts else status))
+        expr = head.TRACKER.expressions() if pts else {}
+        for key, item in self.expr_bars.items():
+            v = max(0.0, min(1.0, expr.get(key, 0.0)))
+            y0 = self.expr_canvas.coords(item)[1]
+            self.expr_canvas.coords(item, 70, y0, 70 + 220 * v, y0 + 8)
         if bool(head.TRACKER.running()) != (self.toggle_btn.cget("text") == "Desligar câmera"):
             self.refresh_button()
